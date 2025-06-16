@@ -18,6 +18,6 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
-  },
-  base: 'Sids-Blog.github.io', // 👈 very important!
+  }
+   // 👈 very important!
 }));
