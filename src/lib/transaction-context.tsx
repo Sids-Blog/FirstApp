@@ -5,6 +5,7 @@ interface TransactionContextType {
   transactions: Transaction[];
   addTransaction: (transaction: Omit<Transaction, 'id'>) => Promise<void>;
   removeTransaction: (id: string) => Promise<void>;
+  updateTransaction: (id: string, updates: Partial<Transaction>) => Promise<Transaction>;
   isLoading: boolean;
   isConnected: boolean;
   error: string | null;
@@ -111,11 +112,37 @@ export const TransactionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   };
 
+  const updateTransaction = async (id: string, updates: Partial<Transaction>) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const { data, error: supabaseError } = await supabase
+        .from('transactions')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+      if (supabaseError) {
+        throw supabaseError;
+      }
+      setTransactions(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+      console.log('Transaction updated in Supabase');
+      return data;
+    } catch (error) {
+      console.error('Error updating transaction:', error);
+      setError(error instanceof Error ? error.message : 'Failed to update transaction');
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <TransactionContext.Provider value={{
       transactions,
       addTransaction,
       removeTransaction,
+      updateTransaction,
       isLoading,
       isConnected,
       error,
