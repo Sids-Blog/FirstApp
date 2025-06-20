@@ -28,8 +28,8 @@ const Index = () => {
             <div className="flex items-center space-x-2">
               <TrendingUp className="h-6 w-6 sm:h-8 sm:w-8 text-emerald-600" />
               <h1 className="text-lg sm:text-2xl font-bold text-gray-900">
-                <span className="sm:hidden">Expense</span>
-                <span className="hidden sm:inline">ExpenseTracker</span>
+                <span className="sm:hidden">Budget</span>
+                <span className="hidden sm:inline">Budget tracker</span>
               </h1>
             </div>
             <div className="flex items-center space-x-2 sm:space-x-4">
@@ -151,6 +151,11 @@ const Index = () => {
           <Plus className={`h-6 w-6 transition-transform ${showFabMenu ? 'rotate-45' : ''}`} />
         </Button>
       </div>
+
+      {/* Footer */}
+      <footer className="w-full mt-8 py-4 bg-white border-t text-center text-xs text-gray-500">
+        This site is created for Siddeshwar's personal budget tracking
+      </footer>
     </div>
   );
 };

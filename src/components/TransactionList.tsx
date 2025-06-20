@@ -261,6 +261,14 @@ const TransactionList = () => {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="flex justify-end">
+                <Button variant="ghost" size="sm" onClick={() => {
+                  setExpenseSearch("");
+                  setExpenseCategory("all");
+                  setExpenseDate("");
+                  setExpensePaymentMethod("all");
+                }}>Clear All Filters</Button>
+              </div>
             </div>
 
             {/* Expense List */}
@@ -328,19 +336,12 @@ const TransactionList = () => {
                   onChange={e => setIncomeDate(e.target.value)}
                 />
               </div>
-              <div>
-                <Label htmlFor="income-payment">Filter by Payment Method</Label>
-                <Select value={incomePaymentMethod} onValueChange={setIncomePaymentMethod}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All payment methods" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All payment methods</SelectItem>
-                    {paymentMethods.map((method) => (
-                      <SelectItem key={method} value={method}>{method}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="flex justify-end">
+                <Button variant="ghost" size="sm" onClick={() => {
+                  setIncomeSearch("");
+                  setIncomeSource("all");
+                  setIncomeDate("");
+                }}>Clear All Filters</Button>
               </div>
             </div>
 
@@ -413,17 +414,19 @@ const TransactionList = () => {
                 <Label>Description</Label>
                 <Input value={editForm.description || ''} onChange={e => handleEditFormChange('description', e.target.value)} />
               </div>
-              <div>
-                <Label>Payment Method</Label>
-                <Select value={editForm.payment_method || ''} onValueChange={val => handleEditFormChange('payment_method', val)}>
-                  <SelectTrigger><SelectValue placeholder="Select payment method" /></SelectTrigger>
-                  <SelectContent>
-                    {paymentMethods.map((method) => (
-                      <SelectItem key={method} value={method}>{method}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {isExpense && (
+                <div>
+                  <Label>Payment Method</Label>
+                  <Select value={editForm.payment_method || ''} onValueChange={val => handleEditFormChange('payment_method', val)}>
+                    <SelectTrigger><SelectValue placeholder="Select payment method" /></SelectTrigger>
+                    <SelectContent>
+                      {paymentMethods.map((method) => (
+                        <SelectItem key={method} value={method}>{method}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <DialogFooter>
                 <Button type="submit">Save</Button>
               </DialogFooter>

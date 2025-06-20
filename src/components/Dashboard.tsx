@@ -14,14 +14,38 @@ import {
   Pie,
   PieChart as RechartsPieChart,
   ResponsiveContainer,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   XAxis,
   YAxis
 } from 'recharts';
+import { useData } from "@/lib/data-context";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import React from "react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const Dashboard = () => {
   const { transactions } = useTransactions();
   const { currency } = useCurrency();
+  const { expenseCategories, incomeCategories, paymentMethods } = useData();
+
+  // FILTER STATES
+  // Monthly Trend
+  const [trendType, setTrendType] = React.useState<'all' | 'income' | 'expense'>('all');
+  const [trendStartDate, setTrendStartDate] = React.useState("");
+  const [trendEndDate, setTrendEndDate] = React.useState("");
+  // Category Breakdown
+  const [categoryMonth, setCategoryMonth] = React.useState(() => new Date().toISOString().slice(0, 7));
+  // Daily Spending
+  const [dailyCategory, setDailyCategory] = React.useState('all');
+  const [dailyStartDate, setDailyStartDate] = React.useState("");
+  const [dailyEndDate, setDailyEndDate] = React.useState("");
+  // Payment Methods
+  const [paymentMethodFilter, setPaymentMethodFilter] = React.useState('all');
+  // Top Spending Categories
+  const [topCatStartDate, setTopCatStartDate] = React.useState("");
+  const [topCatEndDate, setTopCatEndDate] = React.useState("");
 
   const getCurrencySymbol = () => {
     switch (currency) {
@@ -84,27 +108,45 @@ const Dashboard = () => {
 
   // Chart data calculations
   const chartData = useMemo(() => {
-    // Monthly trend data (last 6 months)
-    const monthlyData = [];
-    for (let i = 5; i >= 0; i--) {
-      const date = new Date();
-      date.setMonth(date.getMonth() - i);
-      const month = date.getMonth();
-      const year = date.getFullYear();
-      
-      const monthTransactions = transactions.filter(t => {
+    // Monthly trend data (last 6 months or filtered by date)
+    let monthlyData = [];
+    let monthsToShow = 6;
+    let customMonths: { month: string, year: number }[] = [];
+    if (trendStartDate && trendEndDate) {
+      // Generate months between start and end
+      const start = new Date(trendStartDate);
+      const end = new Date(trendEndDate);
+      let d = new Date(start.getFullYear(), start.getMonth(), 1);
+      while (d <= end) {
+        customMonths.push({ month: d.toLocaleDateString('en-US', { month: 'short' }), year: d.getFullYear() });
+        d.setMonth(d.getMonth() + 1);
+      }
+    }
+    for (let i = (customMonths.length ? customMonths.length - 1 : monthsToShow - 1); i >= 0; i--) {
+      let date, month, year;
+      if (customMonths.length) {
+        month = new Date(trendStartDate).getMonth() + i;
+        year = new Date(trendStartDate).getFullYear();
+        date = new Date(year, month, 1);
+        month = date.getMonth();
+        year = date.getFullYear();
+      } else {
+        date = new Date();
+        date.setMonth(date.getMonth() - i);
+        month = date.getMonth();
+        year = date.getFullYear();
+      }
+      let monthTransactions = transactions.filter(t => {
         const transactionDate = new Date(t.date);
-        return transactionDate.getMonth() === month && transactionDate.getFullYear() === year;
+        let inMonth = transactionDate.getMonth() === month && transactionDate.getFullYear() === year;
+        let inRange = true;
+        if (trendStartDate) inRange = inRange && t.date >= trendStartDate;
+        if (trendEndDate) inRange = inRange && t.date <= trendEndDate;
+        return inMonth && inRange;
       });
-
-      const income = monthTransactions
-        .filter(t => t.type === 'income')
-        .reduce((sum, t) => sum + t.amount, 0);
-      
-      const expenses = monthTransactions
-        .filter(t => t.type === 'expense')
-        .reduce((sum, t) => sum + t.amount, 0);
-
+      if (trendType !== 'all') monthTransactions = monthTransactions.filter(t => t.type === trendType);
+      const income = monthTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+      const expenses = monthTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
       monthlyData.push({
         month: date.toLocaleDateString('en-US', { month: 'short' }),
         income,
@@ -112,52 +154,95 @@ const Dashboard = () => {
         net: income - expenses
       });
     }
-
-    // Category pie chart data
-    const categoryData = stats.topCategories.map((cat, index) => ({
-      name: cat.category,
-      value: cat.amount,
-      percentage: cat.percentage
+    // Category pie chart data (for selected month)
+    const [catYear, catMonth] = categoryMonth.split('-').map(Number);
+    const catMonthTransactions = transactions.filter(t => {
+      const d = new Date(t.date);
+      return d.getFullYear() === catYear && d.getMonth() + 1 === catMonth && t.type === 'expense';
+    });
+    const expensesByCategory = catMonthTransactions.reduce((acc, t) => {
+      acc[t.category] = (acc[t.category] || 0) + t.amount;
+      return acc;
+    }, {} as Record<string, number>);
+    const totalExpenses = catMonthTransactions.reduce((sum, t) => sum + t.amount, 0);
+    const categoryData = Object.entries(expensesByCategory).map(([category, amount]) => ({
+      name: category,
+      value: amount,
+      percentage: totalExpenses > 0 ? (amount / totalExpenses) * 100 : 0
     }));
-
-    // Daily spending for last 7 days
-    const dailyData = [];
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      const dateString = date.toISOString().split('T')[0];
-      
-      const dayExpenses = transactions
-        .filter(t => t.type === 'expense' && t.date === dateString)
-        .reduce((sum, t) => sum + t.amount, 0);
-
+    // Daily spending for last 7 days, filtered by category and date
+    let dailyData = [];
+    let daysToShow = 7;
+    let customDays: string[] = [];
+    if (dailyStartDate && dailyEndDate) {
+      let d = new Date(dailyStartDate);
+      const end = new Date(dailyEndDate);
+      while (d <= end) {
+        customDays.push(d.toISOString().split('T')[0]);
+        d.setDate(d.getDate() + 1);
+      }
+    }
+    for (let i = (customDays.length ? customDays.length - 1 : daysToShow - 1); i >= 0; i--) {
+      let date, dateString;
+      if (customDays.length) {
+        dateString = customDays[customDays.length - 1 - i];
+        date = new Date(dateString);
+      } else {
+        date = new Date();
+        date.setDate(date.getDate() - i);
+        dateString = date.toISOString().split('T')[0];
+      }
+      let dayExpenses = transactions.filter(t => t.type === 'expense' && t.date === dateString);
+      if (dailyCategory !== 'all') dayExpenses = dayExpenses.filter(t => t.category === dailyCategory);
+      if (dailyStartDate || dailyEndDate) {
+        dayExpenses = dayExpenses.filter(t => {
+          if (dailyStartDate && t.date < dailyStartDate) return false;
+          if (dailyEndDate && t.date > dailyEndDate) return false;
+          return true;
+        });
+      }
       dailyData.push({
         day: date.toLocaleDateString('en-US', { weekday: 'short' }),
-        expenses: dayExpenses
+        expenses: dayExpenses.reduce((sum, t) => sum + t.amount, 0)
       });
     }
-
-    // Payment method data
-    const paymentMethodData = transactions
-      .filter(t => t.payment_method)
-      .reduce((acc, t) => {
-        const method = t.payment_method || 'Unknown';
-        acc[method] = (acc[method] || 0) + t.amount;
-        return acc;
-      }, {} as Record<string, number>);
-
+    // Payment method data (all time, filterable)
+    let paymentMethodTx = transactions.filter(t => t.payment_method);
+    if (paymentMethodFilter !== 'all') paymentMethodTx = paymentMethodTx.filter(t => t.payment_method === paymentMethodFilter);
+    const paymentMethodData = paymentMethodTx.reduce((acc, t) => {
+      const method = t.payment_method || 'Unknown';
+      acc[method] = (acc[method] || 0) + t.amount;
+      return acc;
+    }, {} as Record<string, number>);
     const paymentData = Object.entries(paymentMethodData).map(([method, amount]) => ({
       name: method,
       value: amount
     }));
-
+    // Top Spending Categories (filtered by date)
+    let topCatTx = transactions.filter(t => t.type === 'expense');
+    if (topCatStartDate) topCatTx = topCatTx.filter(t => t.date >= topCatStartDate);
+    if (topCatEndDate) topCatTx = topCatTx.filter(t => t.date <= topCatEndDate);
+    const topCatByCategory = topCatTx.reduce((acc, t) => {
+      acc[t.category] = (acc[t.category] || 0) + t.amount;
+      return acc;
+    }, {} as Record<string, number>);
+    const topCatTotal = topCatTx.reduce((sum, t) => sum + t.amount, 0);
+    const topCategories = Object.entries(topCatByCategory)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 5)
+      .map(([category, amount]) => ({
+        category,
+        amount,
+        percentage: topCatTotal > 0 ? (amount / topCatTotal) * 100 : 0
+      }));
     return {
       monthlyData,
       categoryData,
       dailyData,
-      paymentData
+      paymentData,
+      topCategories
     };
-  }, [transactions, stats.topCategories]);
+  }, [transactions, trendType, trendStartDate, trendEndDate, categoryMonth, dailyCategory, dailyStartDate, dailyEndDate, paymentMethodFilter, topCatStartDate, topCatEndDate]);
 
   const formatAmount = (amount: number) => {
     return `${getCurrencySymbol()}${Math.abs(amount).toLocaleString(undefined, {
@@ -261,6 +346,24 @@ const Dashboard = () => {
               Income vs Expenses Trend
             </CardTitle>
             <CardDescription>Last 6 months comparison</CardDescription>
+            <div className="flex flex-wrap gap-2 mt-2 sm:flex-row flex-col items-center">
+              <Select value={trendType} onValueChange={val => setTrendType(val as 'all' | 'income' | 'expense')}>
+                <SelectTrigger className="w-32"><SelectValue placeholder="Type" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="income">Income</SelectItem>
+                  <SelectItem value="expense">Expense</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input type="date" value={trendStartDate} onChange={e => setTrendStartDate(e.target.value)} className="w-36" placeholder="Start date" />
+              <Input type="date" value={trendEndDate} onChange={e => setTrendEndDate(e.target.value)} className="w-36" placeholder="End date" />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="destructive" size="icon" onClick={() => { setTrendType('all'); setTrendStartDate(""); setTrendEndDate(""); }} className="h-7 w-7"><span className="sr-only">Clear filter</span><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></Button>
+                </TooltipTrigger>
+                <TooltipContent>Clear filter</TooltipContent>
+              </Tooltip>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="h-80">
@@ -269,7 +372,7 @@ const Dashboard = () => {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis tickFormatter={(value) => `${getCurrencySymbol()}${value}`} />
-                  <Tooltip content={<CustomTooltip />} />
+                  <RechartsTooltip content={CustomTooltip as any} />
                   <Legend />
                   <Line 
                     type="monotone" 
@@ -299,6 +402,15 @@ const Dashboard = () => {
               Spending by Category
             </CardTitle>
             <CardDescription>This month's expense breakdown</CardDescription>
+            <div className="flex flex-wrap gap-2 mt-2 sm:flex-row flex-col items-center">
+              <Input type="month" value={categoryMonth} onChange={e => setCategoryMonth(e.target.value)} className="w-40" />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="destructive" size="icon" onClick={() => setCategoryMonth(new Date().toISOString().slice(0, 7))} className="h-7 w-7"><span className="sr-only">Clear filter</span><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></Button>
+                </TooltipTrigger>
+                <TooltipContent>Clear filter</TooltipContent>
+              </Tooltip>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="h-80">
@@ -318,9 +430,7 @@ const Dashboard = () => {
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip 
-                      formatter={(value: any) => [formatAmount(value), 'Amount']}
-                    />
+                    <RechartsTooltip content={CustomTooltip as any} />
                     <Legend />
                   </RechartsPieChart>
                 </ResponsiveContainer>
@@ -344,6 +454,25 @@ const Dashboard = () => {
           <CardHeader>
             <CardTitle>Daily Spending Pattern</CardTitle>
             <CardDescription>Last 7 days expenses</CardDescription>
+            <div className="flex flex-wrap gap-2 mt-2 sm:flex-row flex-col items-center">
+              <Select value={dailyCategory} onValueChange={setDailyCategory}>
+                <SelectTrigger className="w-40"><SelectValue placeholder="All Categories" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {expenseCategories.map(cat => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input type="date" value={dailyStartDate} onChange={e => setDailyStartDate(e.target.value)} className="w-36" placeholder="Start date" />
+              <Input type="date" value={dailyEndDate} onChange={e => setDailyEndDate(e.target.value)} className="w-36" placeholder="End date" />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="destructive" size="icon" onClick={() => { setDailyCategory('all'); setDailyStartDate(""); setDailyEndDate(""); }} className="h-7 w-7"><span className="sr-only">Clear filter</span><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></Button>
+                </TooltipTrigger>
+                <TooltipContent>Clear filter</TooltipContent>
+              </Tooltip>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="h-64">
@@ -352,7 +481,7 @@ const Dashboard = () => {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="day" />
                   <YAxis tickFormatter={(value) => `${getCurrencySymbol()}${value}`} />
-                  <Tooltip content={<CustomTooltip />} />
+                  <RechartsTooltip content={CustomTooltip as any} />
                   <Bar dataKey="expenses" fill="#ef4444" name="Expenses" />
                 </BarChart>
               </ResponsiveContainer>
@@ -365,6 +494,23 @@ const Dashboard = () => {
           <CardHeader>
             <CardTitle>Payment Methods</CardTitle>
             <CardDescription>Transaction amounts by payment method</CardDescription>
+            <div className="flex flex-wrap gap-2 mt-2 sm:flex-row flex-col items-center">
+              <Select value={paymentMethodFilter} onValueChange={setPaymentMethodFilter}>
+                <SelectTrigger className="w-40"><SelectValue placeholder="All Methods" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Methods</SelectItem>
+                  {paymentMethods.map(method => (
+                    <SelectItem key={method} value={method}>{method}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="destructive" size="icon" onClick={() => setPaymentMethodFilter('all')} className="h-7 w-7"><span className="sr-only">Clear filter</span><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></Button>
+                </TooltipTrigger>
+                <TooltipContent>Clear filter</TooltipContent>
+              </Tooltip>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="h-64">
@@ -382,9 +528,7 @@ const Dashboard = () => {
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip 
-                      formatter={(value: any) => [formatAmount(value), 'Amount']}
-                    />
+                    <RechartsTooltip content={CustomTooltip as any} />
                     <Legend />
                   </RechartsPieChart>
                 </ResponsiveContainer>
@@ -406,9 +550,19 @@ const Dashboard = () => {
         <CardHeader>
           <CardTitle>Top Spending Categories</CardTitle>
           <CardDescription>Your biggest expense categories this month</CardDescription>
+          <div className="flex flex-wrap gap-2 mt-2 sm:flex-row flex-col items-center">
+            <Input type="date" value={topCatStartDate} onChange={e => setTopCatStartDate(e.target.value)} className="w-36" placeholder="Start date" />
+            <Input type="date" value={topCatEndDate} onChange={e => setTopCatEndDate(e.target.value)} className="w-36" placeholder="End date" />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="destructive" size="icon" onClick={() => { setTopCatStartDate(""); setTopCatEndDate(""); }} className="h-7 w-7"><span className="sr-only">Clear filter</span><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></Button>
+              </TooltipTrigger>
+              <TooltipContent>Clear filter</TooltipContent>
+            </Tooltip>
+          </div>
         </CardHeader>
         <CardContent>
-          {stats.topCategories.length === 0 ? (
+          {chartData.topCategories.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               <TrendingDown className="h-12 w-12 mx-auto mb-3 text-gray-300" />
               <p className="text-lg font-medium">No expenses yet</p>
@@ -416,7 +570,7 @@ const Dashboard = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              {stats.topCategories.map((category, index) => (
+              {chartData.topCategories.map((category, index) => (
                 <div key={category.category} className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center text-red-600 font-semibold text-sm">
