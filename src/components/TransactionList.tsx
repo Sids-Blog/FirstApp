@@ -11,6 +11,8 @@ import { Calendar, DollarSign, Euro, IndianRupee, PoundSterling, Search, Trash2,
 import { useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { format } from "date-fns";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const TransactionItem = ({ transaction, onDelete, onEdit }: { transaction: Transaction; onDelete: (id: string) => void; onEdit: (transaction: Transaction) => void }) => {
   const getCurrencyIcon = (currency: string) => {
@@ -201,6 +203,42 @@ const TransactionList = () => {
     URL.revokeObjectURL(url);
   }
 
+  function downloadPDF(expenses: Transaction[], income: Transaction[], filename: string) {
+    const doc = new jsPDF();
+    // Expenses Table
+    doc.setFontSize(14);
+    doc.text('Expenses', 14, 16);
+    autoTable(doc, {
+      startY: 20,
+      head: [["Date", "Amount", "Currency", "Category", "Description", "Payment Method"]],
+      body: expenses.map(t => [
+        t.date,
+        t.amount,
+        t.currency,
+        t.category,
+        t.description || "",
+        t.payment_method || ""
+      ]),
+    });
+    // Income Table
+    let finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 30;
+    doc.setFontSize(14);
+    doc.text('Income', 14, finalY);
+    autoTable(doc, {
+      startY: finalY + 4,
+      head: [["Date", "Amount", "Currency", "Category", "Description", "Payment Method"]],
+      body: income.map(t => [
+        t.date,
+        t.amount,
+        t.currency,
+        t.category,
+        t.description || "",
+        t.payment_method || ""
+      ]),
+    });
+    doc.save(filename);
+  }
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -369,6 +407,7 @@ const TransactionList = () => {
       </div>
       <div className="flex justify-end gap-4 mt-8">
         <Button variant="outline" onClick={() => downloadCSVCombined(filteredExpenses, filteredIncome, "transactions.csv")}>Download All Transactions CSV</Button>
+        <Button variant="outline" onClick={() => downloadPDF(filteredExpenses, filteredIncome, "transactions.pdf")}>Download as PDF</Button>
       </div>
       <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
         <DialogContent>

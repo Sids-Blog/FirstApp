@@ -10,6 +10,7 @@ interface TransactionContextType {
   isConnected: boolean;
   error: string | null;
   refreshTransactions: () => Promise<void>;
+  bulkRenameInTransactions: (field: 'category' | 'payment_method', oldValue: string, newValue: string) => Promise<void>;
 }
 
 const TransactionContext = createContext<TransactionContextType | undefined>(undefined);
@@ -137,6 +138,30 @@ export const TransactionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   };
 
+  // Bulk update category or payment method in all transactions
+  const bulkRenameInTransactions = async (field: 'category' | 'payment_method', oldValue: string, newValue: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const { error: supabaseError } = await supabase
+        .from('transactions')
+        .update({ [field]: newValue })
+        .eq(field, oldValue);
+      if (supabaseError) {
+        throw supabaseError;
+      }
+      // Update local state
+      setTransactions(prev => prev.map(t => t[field] === oldValue ? { ...t, [field]: newValue } : t));
+      console.log(`Renamed ${field} from '${oldValue}' to '${newValue}' in all transactions`);
+    } catch (error) {
+      console.error('Error bulk renaming in transactions:', error);
+      setError(error instanceof Error ? error.message : 'Failed to bulk rename');
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <TransactionContext.Provider value={{
       transactions,
@@ -146,7 +171,8 @@ export const TransactionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       isLoading,
       isConnected,
       error,
-      refreshTransactions
+      refreshTransactions,
+      bulkRenameInTransactions
     }}>
       {children}
     </TransactionContext.Provider>

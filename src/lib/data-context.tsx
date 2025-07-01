@@ -14,6 +14,8 @@ interface DataContextType {
   isLoading: boolean;
   error: string | null;
   refreshData: () => Promise<void>;
+  updateCategoryOrder: (type: 'expense' | 'income', orderedNames: string[]) => Promise<void>;
+  updatePaymentMethodOrder: (orderedNames: string[]) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -46,14 +48,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Load categories
       const { data: categoriesData, error: categoriesError } = await supabase
         .from('categories')
-        .select('*');
+        .select('*')
+        .order('order', { ascending: true });
 
       if (categoriesError) throw categoriesError;
 
       // Load payment methods
       const { data: paymentMethodsData, error: paymentMethodsError } = await supabase
         .from('payment_methods')
-        .select('*');
+        .select('*')
+        .order('order', { ascending: true });
 
       if (paymentMethodsError) throw paymentMethodsError;
 
@@ -182,6 +186,39 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Update order in DB for categories
+  const updateCategoryOrder = async (type: 'expense' | 'income', orderedNames: string[]) => {
+    setIsLoading(true);
+    try {
+      for (let i = 0; i < orderedNames.length; i++) {
+        await supabase
+          .from('categories')
+          .update({ order: i })
+          .eq('name', orderedNames[i])
+          .eq('type', type);
+      }
+      await refreshData();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Update order in DB for payment methods
+  const updatePaymentMethodOrder = async (orderedNames: string[]) => {
+    setIsLoading(true);
+    try {
+      for (let i = 0; i < orderedNames.length; i++) {
+        await supabase
+          .from('payment_methods')
+          .update({ order: i })
+          .eq('name', orderedNames[i]);
+      }
+      await refreshData();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <DataContext.Provider value={{
       expenseCategories,
@@ -196,6 +233,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isLoading,
       error,
       refreshData,
+      updateCategoryOrder,
+      updatePaymentMethodOrder,
     }}>
       {children}
     </DataContext.Provider>
