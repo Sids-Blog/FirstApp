@@ -3,16 +3,67 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useData } from "@/lib/data-context";
 import { Transaction } from "@/lib/supabase";
 import { useTransactions } from "@/lib/transaction-context";
-import { Calendar, DollarSign, Euro, IndianRupee, PoundSterling, Search, Trash2, TrendingDown, TrendingUp } from "lucide-react";
+import { Calendar, DollarSign, Euro, IndianRupee, PoundSterling, Search, Trash2, TrendingDown, TrendingUp, X, Filter, ChevronDown, ChevronUp, Edit, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+
+const getCurrencySymbol = (currency: string) => {
+  switch (currency) {
+    case 'INR': return '₹';
+    case 'EUR': return '€';
+    case 'GBP': return '£';
+    default: return '$';
+  }
+};
+
+  const sortTransactions = (transactions: Transaction[], field: keyof Transaction, direction: 'asc' | 'desc' | null) => {
+    // If direction is null, return default sorting (by date descending)
+    if (direction === null) {
+      return [...transactions].sort((a, b) => {
+        const aDate = new Date(a.date).getTime();
+        const bDate = new Date(b.date).getTime();
+        return bDate - aDate; // Descending by date
+      });
+    }
+
+    return [...transactions].sort((a, b) => {
+      let aValue = a[field];
+      let bValue = b[field];
+
+      // Handle date sorting
+      if (field === 'date') {
+        aValue = new Date(aValue as string).getTime();
+        bValue = new Date(bValue as string).getTime();
+      }
+
+      // Handle amount sorting
+      if (field === 'amount') {
+        aValue = Number(aValue);
+        bValue = Number(bValue);
+      }
+
+      // Handle string sorting (case insensitive)
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        aValue = aValue.toLowerCase();
+        bValue = bValue.toLowerCase();
+      }
+
+      if (direction === 'asc') {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
+  };
 
 const TransactionItem = ({ transaction, onDelete, onEdit }: { transaction: Transaction; onDelete: (id: string) => void; onEdit: (transaction: Transaction) => void }) => {
   const getCurrencyIcon = (currency: string) => {
@@ -84,49 +135,60 @@ const TransactionItem = ({ transaction, onDelete, onEdit }: { transaction: Trans
 
 const TransactionList = () => {
   const { transactions, removeTransaction, updateTransaction } = useTransactions();
-  const { expenseCategories, incomeCategories, paymentMethods } = useData();
+  const { expenseCategories: availableExpenseCategories, incomeCategories: availableIncomeCategories, paymentMethods } = useData();
   const { toast } = useToast();
   
   const [expenseSearch, setExpenseSearch] = useState("");
-  const [expenseCategory, setExpenseCategory] = useState("all");
+  const [expenseCategories, setExpenseCategories] = useState<string[]>([]);
   const [incomeSearch, setIncomeSearch] = useState("");
-  const [incomeSource, setIncomeSource] = useState("all");
+  const [incomeSources, setIncomeSources] = useState<string[]>([]);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [editForm, setEditForm] = useState<Partial<Transaction>>({});
   const [expenseDate, setExpenseDate] = useState("");
-  const [expensePaymentMethod, setExpensePaymentMethod] = useState("all");
+  const [expensePaymentMethods, setExpensePaymentMethods] = useState<string[]>([]);
   const [incomeDate, setIncomeDate] = useState("");
-  const [incomePaymentMethod, setIncomePaymentMethod] = useState("all");
+  const [incomePaymentMethods, setIncomePaymentMethods] = useState<string[]>([]);
+  const [showExpenseFilters, setShowExpenseFilters] = useState(false);
+  const [showIncomeFilters, setShowIncomeFilters] = useState(false);
+  const [activeTab, setActiveTab] = useState("expenses");
+  const [expenseSortField, setExpenseSortField] = useState<keyof Transaction>('date');
+  const [expenseSortDirection, setExpenseSortDirection] = useState<'asc' | 'desc' | null>('desc');
+  const [incomeSortField, setIncomeSortField] = useState<keyof Transaction>('date');
+  const [incomeSortDirection, setIncomeSortDirection] = useState<'asc' | 'desc' | null>('desc');
 
   // Filter transactions into expenses and income
   const filteredExpenses = useMemo(() => {
-    return transactions
+    const filtered = transactions
       .filter(t => t.type === 'expense')
       .filter(t => {
         const matchesSearch = !expenseSearch || 
           t.description.toLowerCase().includes(expenseSearch.toLowerCase()) ||
           t.category.toLowerCase().includes(expenseSearch.toLowerCase());
-        const matchesCategory = expenseCategory === "all" || t.category === expenseCategory;
+        const matchesCategory = expenseCategories.length === 0 || expenseCategories.includes(t.category);
         const matchesDate = !expenseDate || t.date === expenseDate;
-        const matchesPayment = expensePaymentMethod === "all" || t.payment_method === expensePaymentMethod;
+        const matchesPayment = expensePaymentMethods.length === 0 || (t.payment_method && expensePaymentMethods.includes(t.payment_method));
         return matchesSearch && matchesCategory && matchesDate && matchesPayment;
       });
-  }, [transactions, expenseSearch, expenseCategory, expenseDate, expensePaymentMethod]);
+    
+    return sortTransactions(filtered, expenseSortField, expenseSortDirection);
+  }, [transactions, expenseSearch, expenseCategories, expenseDate, expensePaymentMethods, expenseSortField, expenseSortDirection]);
 
   const filteredIncome = useMemo(() => {
-    return transactions
+    const filtered = transactions
       .filter(t => t.type === 'income')
       .filter(t => {
         const matchesSearch = !incomeSearch || 
           t.description.toLowerCase().includes(incomeSearch.toLowerCase()) ||
           t.category.toLowerCase().includes(incomeSearch.toLowerCase());
-        const matchesSource = incomeSource === "all" || t.category === incomeSource;
+        const matchesSource = incomeSources.length === 0 || incomeSources.includes(t.category);
         const matchesDate = !incomeDate || t.date === incomeDate;
-        const matchesPayment = incomePaymentMethod === "all" || t.payment_method === incomePaymentMethod;
+        const matchesPayment = incomePaymentMethods.length === 0 || (t.payment_method && incomePaymentMethods.includes(t.payment_method));
         return matchesSearch && matchesSource && matchesDate && matchesPayment;
       });
-  }, [transactions, incomeSearch, incomeSource, incomeDate, incomePaymentMethod]);
+    
+    return sortTransactions(filtered, incomeSortField, incomeSortDirection);
+  }, [transactions, incomeSearch, incomeSources, incomeDate, incomePaymentMethods, incomeSortField, incomeSortDirection]);
 
   const handleDeleteTransaction = async (id: string) => {
     if (confirm('Are you sure you want to delete this transaction?')) {
@@ -170,6 +232,50 @@ const TransactionList = () => {
   };
 
   const isExpense = editForm.type === 'expense';
+
+  const handleSort = (field: keyof Transaction, isExpenseTab: boolean) => {
+    if (isExpenseTab) {
+      if (expenseSortField === field) {
+        // Cycle through: asc -> desc -> null (default)
+        if (expenseSortDirection === 'asc') {
+          setExpenseSortDirection('desc');
+        } else if (expenseSortDirection === 'desc') {
+          setExpenseSortDirection(null);
+        } else {
+          setExpenseSortDirection('asc');
+        }
+      } else {
+        // New field, start with ascending
+        setExpenseSortField(field);
+        setExpenseSortDirection('asc');
+      }
+    } else {
+      if (incomeSortField === field) {
+        // Cycle through: asc -> desc -> null (default)
+        if (incomeSortDirection === 'asc') {
+          setIncomeSortDirection('desc');
+        } else if (incomeSortDirection === 'desc') {
+          setIncomeSortDirection(null);
+        } else {
+          setIncomeSortDirection('asc');
+        }
+      } else {
+        // New field, start with ascending
+        setIncomeSortField(field);
+        setIncomeSortDirection('asc');
+      }
+    }
+  };
+
+  const getSortIcon = (field: keyof Transaction, isExpenseTab: boolean) => {
+    const currentField = isExpenseTab ? expenseSortField : incomeSortField;
+    const currentDirection = isExpenseTab ? expenseSortDirection : incomeSortDirection;
+    
+    if (currentField !== field || currentDirection === null) {
+      return <ArrowUpDown className="h-4 w-4" />;
+    }
+    return currentDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />;
+  };
 
   function downloadCSVCombined(expenses: Transaction[], income: Transaction[], filename: string) {
     const all = [...expenses, ...income];
@@ -221,7 +327,7 @@ const TransactionList = () => {
       ]),
     });
     // Income Table
-    let finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 30;
+    let finalY = 30;
     doc.setFontSize(14);
     doc.text('Income', 14, finalY);
     autoTable(doc, {
@@ -239,176 +345,462 @@ const TransactionList = () => {
     doc.save(filename);
   }
 
-  return (
+    return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Expenses Section */}
-      <Card>
-        <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-red-600">
-              <TrendingDown className="h-5 w-5" />
-              Expenses ({filteredExpenses.length})
-          </CardTitle>
-            <CardDescription>Track your spending</CardDescription>
-        </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Expense Filters */}
-            <div className="space-y-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search expenses..."
-                  value={expenseSearch}
-                  onChange={(e) => setExpenseSearch(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-              <div>
-                <Label htmlFor="expense-category">Filter by Category</Label>
-                <Select value={expenseCategory} onValueChange={setExpenseCategory}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All categories" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All categories</SelectItem>
-                    {expenseCategories.map((category) => (
-                      <SelectItem key={category} value={category}>{category}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="expense-date">Filter by Date</Label>
-                <Input
-                  type="date"
-                  value={expenseDate}
-                  onChange={e => setExpenseDate(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="expense-payment">Filter by Payment Method</Label>
-                <Select value={expensePaymentMethod} onValueChange={setExpensePaymentMethod}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All payment methods" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All payment methods</SelectItem>
-                    {paymentMethods.map((method) => (
-                      <SelectItem key={method} value={method}>{method}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex justify-end">
-                <Button variant="ghost" size="sm" onClick={() => {
-                  setExpenseSearch("");
-                  setExpenseCategory("all");
-                  setExpenseDate("");
-                  setExpensePaymentMethod("all");
-                }}>Clear All Filters</Button>
-              </div>
-            </div>
+      {/* Download Buttons */}
+      <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-4">
+        <Button variant="outline" onClick={() => downloadCSVCombined(filteredExpenses, filteredIncome, "transactions.csv")} className="text-sm">
+          Download All Transactions CSV
+        </Button>
+        <Button variant="outline" onClick={() => downloadPDF(filteredExpenses, filteredIncome, "transactions.pdf")} className="text-sm">
+          Download as PDF
+        </Button>
+      </div>
 
-            {/* Expense List */}
-            <div className="space-y-3 h-96 overflow-y-auto">
-              {filteredExpenses.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <TrendingDown className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                  <p className="text-lg font-medium">No expenses found</p>
-                  <p className="text-sm">Add your first expense to get started!</p>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="expenses" className="flex items-center gap-2">
+            <TrendingDown className="h-4 w-4" />
+            Expenses ({filteredExpenses.length})
+          </TabsTrigger>
+          <TabsTrigger value="income" className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4" />
+            Income ({filteredIncome.length})
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Expenses Tab */}
+        <TabsContent value="expenses" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between text-red-600">
+                <div className="flex items-center gap-2">
+                  <TrendingDown className="h-5 w-5" />
+                  Expenses ({filteredExpenses.length})
                 </div>
-              ) : (
-                filteredExpenses.map((transaction) => (
-                  <TransactionItem
-                    key={transaction.id}
-                    transaction={transaction}
-                    onDelete={handleDeleteTransaction}
-                    onEdit={handleEditTransaction}
-                  />
-                ))
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowExpenseFilters(!showExpenseFilters)}
+                  className="flex items-center gap-2"
+                >
+                  <Filter className="h-4 w-4" />
+                  Filters
+                  {showExpenseFilters ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              </CardTitle>
+              <CardDescription>Track your spending</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Expense Filters */}
+              {showExpenseFilters && (
+                <div className="space-y-3 border rounded-lg p-4 bg-gray-50">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search expenses..."
+                      value={expenseSearch}
+                      onChange={(e) => setExpenseSearch(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  <div>
+                    <Label>Filter by Category</Label>
+                    <div className="space-y-2 max-h-32 overflow-y-auto border rounded-md p-2">
+                      {availableExpenseCategories.map((category) => (
+                        <div key={category} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`expense-cat-${category}`}
+                            checked={expenseCategories.includes(category)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setExpenseCategories([...expenseCategories, category]);
+                              } else {
+                                setExpenseCategories(expenseCategories.filter(c => c !== category));
+                              }
+                            }}
+                          />
+                          <Label htmlFor={`expense-cat-${category}`} className="text-sm cursor-pointer">
+                            {category}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                    {expenseCategories.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {expenseCategories.map((category) => (
+                          <div key={category} className="flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
+                            {category}
+                            <button
+                              onClick={() => setExpenseCategories(expenseCategories.filter(c => c !== category))}
+                              className="text-blue-600 hover:text-blue-800"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="expense-date">Filter by Date</Label>
+                    <Input
+                      type="date"
+                      value={expenseDate}
+                      onChange={e => setExpenseDate(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Filter by Payment Method</Label>
+                    <div className="space-y-2 max-h-32 overflow-y-auto border rounded-md p-2">
+                      {paymentMethods.map((method) => (
+                        <div key={method} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`expense-payment-${method}`}
+                            checked={expensePaymentMethods.includes(method)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setExpensePaymentMethods([...expensePaymentMethods, method]);
+                              } else {
+                                setExpensePaymentMethods(expensePaymentMethods.filter(m => m !== method));
+                              }
+                            }}
+                          />
+                          <Label htmlFor={`expense-payment-${method}`} className="text-sm cursor-pointer">
+                            {method}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                    {expensePaymentMethods.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {expensePaymentMethods.map((method) => (
+                          <div key={method} className="flex items-center gap-1 bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
+                            {method}
+                            <button
+                              onClick={() => setExpensePaymentMethods(expensePaymentMethods.filter(m => m !== method))}
+                              className="text-green-600 hover:text-green-800"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex justify-end">
+                    <Button variant="ghost" size="sm" onClick={() => {
+                      setExpenseSearch("");
+                      setExpenseCategories([]);
+                      setExpenseDate("");
+                      setExpensePaymentMethods([]);
+                    }}>Clear All Filters</Button>
+                  </div>
+                </div>
               )}
-          </div>
-        </CardContent>
-      </Card>
 
-        {/* Income Section */}
-      <Card>
-        <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-emerald-600">
-              <TrendingUp className="h-5 w-5" />
-              Income ({filteredIncome.length})
-            </CardTitle>
-            <CardDescription>Track your earnings</CardDescription>
-        </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Income Filters */}
-            <div className="space-y-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search income..."
-                  value={incomeSearch}
-                  onChange={(e) => setIncomeSearch(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-              <div>
-                <Label htmlFor="income-source">Filter by Source</Label>
-                <Select value={incomeSource} onValueChange={setIncomeSource}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All sources" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All sources</SelectItem>
-                    {incomeCategories.map((source) => (
-                      <SelectItem key={source} value={source}>{source}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="income-date">Filter by Date</Label>
-                <Input
-                  type="date"
-                  value={incomeDate}
-                  onChange={e => setIncomeDate(e.target.value)}
-                />
-              </div>
-              <div className="flex justify-end">
-                <Button variant="ghost" size="sm" onClick={() => {
-                  setIncomeSearch("");
-                  setIncomeSource("all");
-                  setIncomeDate("");
-                }}>Clear All Filters</Button>
-              </div>
-            </div>
-
-            {/* Income List */}
-            <div className="space-y-3 h-96 overflow-y-auto">
-              {filteredIncome.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <TrendingUp className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                  <p className="text-lg font-medium">No income found</p>
-                  <p className="text-sm">Add your first income to get started!</p>
+              {/* Expense Table */}
+              <div className="border rounded-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[600px]">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>
+                        <th 
+                          className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort('date', true)}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span className="hidden sm:inline">Date</span>
+                            <span className="sm:hidden">Date</span>
+                            {getSortIcon('date', true)}
+                          </div>
+                        </th>
+                        <th 
+                          className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort('amount', true)}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span className="hidden sm:inline">Amount</span>
+                            <span className="sm:hidden">Amt</span>
+                            {getSortIcon('amount', true)}
+                          </div>
+                        </th>
+                        <th 
+                          className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort('category', true)}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span className="hidden sm:inline">Category</span>
+                            <span className="sm:hidden">Cat</span>
+                            {getSortIcon('category', true)}
+                          </div>
+                        </th>
+                        <th 
+                          className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort('payment_method', true)}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span className="hidden sm:inline">Payment</span>
+                            <span className="sm:hidden">Pay</span>
+                            {getSortIcon('payment_method', true)}
+                          </div>
+                        </th>
+                        <th 
+                          className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort('description', true)}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span className="hidden sm:inline">Comments</span>
+                            <span className="sm:hidden">Notes</span>
+                            {getSortIcon('description', true)}
+                          </div>
+                        </th>
+                        <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {filteredExpenses.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                            <TrendingDown className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                            <p className="text-lg font-medium">No expenses found</p>
+                            <p className="text-sm">Add your first expense to get started!</p>
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredExpenses.map((transaction) => (
+                          <tr key={transaction.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleEditTransaction(transaction)}>
+                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-900">{transaction.date}</td>
+                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium text-red-600">
+                              {getCurrencySymbol(transaction.currency)}{transaction.amount.toFixed(2)}
+                            </td>
+                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-900">{transaction.category}</td>
+                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-600">{transaction.payment_method || "-"}</td>
+                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-600 max-w-[120px] sm:max-w-[150px] truncate" title={transaction.description || ""}>
+                              {transaction.description ? (transaction.description.length > 20 ? `${transaction.description.substring(0, 20)}...` : transaction.description) : "-"}
+                            </td>
+                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                              <div className="flex items-center justify-center gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => { e.stopPropagation(); handleEditTransaction(transaction); }}
+                                  className="text-blue-600 hover:text-blue-800"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(transaction.id!); }}
+                                  className="text-red-600 hover:text-red-800"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
-              ) : (
-                filteredIncome.map((transaction) => (
-                  <TransactionItem
-                    key={transaction.id}
-                    transaction={transaction}
-                    onDelete={handleDeleteTransaction}
-                    onEdit={handleEditTransaction}
-                  />
-                ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
-      </div>
-      <div className="flex justify-end gap-4 mt-8">
-        <Button variant="outline" onClick={() => downloadCSVCombined(filteredExpenses, filteredIncome, "transactions.csv")}>Download All Transactions CSV</Button>
-        <Button variant="outline" onClick={() => downloadPDF(filteredExpenses, filteredIncome, "transactions.pdf")}>Download as PDF</Button>
-      </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Income Tab */}
+        <TabsContent value="income" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between text-emerald-600">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5" />
+                  Income ({filteredIncome.length})
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowIncomeFilters(!showIncomeFilters)}
+                  className="flex items-center gap-2"
+                >
+                  <Filter className="h-4 w-4" />
+                  Filters
+                  {showIncomeFilters ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              </CardTitle>
+              <CardDescription>Track your earnings</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Income Filters */}
+              {showIncomeFilters && (
+                <div className="space-y-3 border rounded-lg p-4 bg-gray-50">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search income..."
+                      value={incomeSearch}
+                      onChange={(e) => setIncomeSearch(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  <div>
+                    <Label>Filter by Source</Label>
+                    <div className="space-y-2 max-h-32 overflow-y-auto border rounded-md p-2">
+                      {availableIncomeCategories.map((source) => (
+                        <div key={source} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`income-source-${source}`}
+                            checked={incomeSources.includes(source)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setIncomeSources([...incomeSources, source]);
+                              } else {
+                                setIncomeSources(incomeSources.filter(s => s !== source));
+                              }
+                            }}
+                          />
+                          <Label htmlFor={`income-source-${source}`} className="text-sm cursor-pointer">
+                            {source}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                    {incomeSources.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {incomeSources.map((source) => (
+                          <div key={source} className="flex items-center gap-1 bg-emerald-100 text-emerald-800 px-2 py-1 rounded text-xs">
+                            {source}
+                            <button
+                              onClick={() => setIncomeSources(incomeSources.filter(s => s !== source))}
+                              className="text-emerald-600 hover:text-emerald-800"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="income-date">Filter by Date</Label>
+                    <Input
+                      type="date"
+                      value={incomeDate}
+                      onChange={e => setIncomeDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex justify-end">
+                    <Button variant="ghost" size="sm" onClick={() => {
+                      setIncomeSearch("");
+                      setIncomeSources([]);
+                      setIncomeDate("");
+                    }}>Clear All Filters</Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Income Table */}
+              <div className="border rounded-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[500px]">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>
+                        <th 
+                          className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort('date', false)}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span className="hidden sm:inline">Date</span>
+                            <span className="sm:hidden">Date</span>
+                            {getSortIcon('date', false)}
+                          </div>
+                        </th>
+                        <th 
+                          className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort('amount', false)}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span className="hidden sm:inline">Amount</span>
+                            <span className="sm:hidden">Amt</span>
+                            {getSortIcon('amount', false)}
+                          </div>
+                        </th>
+                        <th 
+                          className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort('category', false)}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span className="hidden sm:inline">Source</span>
+                            <span className="sm:hidden">Src</span>
+                            {getSortIcon('category', false)}
+                          </div>
+                        </th>
+                        <th 
+                          className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort('description', false)}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span className="hidden sm:inline">Comments</span>
+                            <span className="sm:hidden">Notes</span>
+                            {getSortIcon('description', false)}
+                          </div>
+                        </th>
+                        <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {filteredIncome.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                            <TrendingUp className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                            <p className="text-lg font-medium">No income found</p>
+                            <p className="text-sm">Add your first income to get started!</p>
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredIncome.map((transaction) => (
+                          <tr key={transaction.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleEditTransaction(transaction)}>
+                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-900">{transaction.date}</td>
+                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium text-emerald-600">
+                              {getCurrencySymbol(transaction.currency)}{transaction.amount.toFixed(2)}
+                            </td>
+                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-900">{transaction.category}</td>
+                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-600 max-w-[120px] sm:max-w-[150px] truncate" title={transaction.description || ""}>
+                              {transaction.description ? (transaction.description.length > 20 ? `${transaction.description.substring(0, 20)}...` : transaction.description) : "-"}
+                            </td>
+                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                              <div className="flex items-center justify-center gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => { e.stopPropagation(); handleEditTransaction(transaction); }}
+                                  className="text-blue-600 hover:text-blue-800"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(transaction.id!); }}
+                                  className="text-red-600 hover:text-red-800"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
       <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
         <DialogContent>
           <DialogHeader>
@@ -443,7 +835,7 @@ const TransactionList = () => {
                 <Select value={editForm.category || ''} onValueChange={val => handleEditFormChange('category', val)}>
                   <SelectTrigger><SelectValue placeholder="Select a category" /></SelectTrigger>
                   <SelectContent>
-                    {(isExpense ? expenseCategories : incomeCategories).map((cat) => (
+                    {(isExpense ? availableExpenseCategories : availableIncomeCategories).map((cat) => (
                       <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                     ))}
                   </SelectContent>

@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useCurrency } from "@/lib/currency-context";
 import { useTransactions } from "@/lib/transaction-context";
-import { AlertCircle, CheckCircle, Database, DollarSign, Monitor, LogOut, Trash2, RefreshCw } from "lucide-react";
+import { AlertCircle, CheckCircle, Database, DollarSign, Monitor, LogOut, Trash2, RefreshCw, EyeOff } from "lucide-react";
 import { useState, useEffect } from "react";
 
 const SettingsPage = () => {
@@ -323,7 +323,7 @@ const SettingsPage = () => {
                   />
                 </div>
                 
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <Button 
                     onClick={handleRootUserAuth}
                     disabled={isAuthenticating || !accessKey.trim()}
@@ -342,6 +342,7 @@ const SettingsPage = () => {
                     onClick={handleCancelAuth}
                     variant="outline"
                     disabled={isAuthenticating}
+                    className="flex-1 sm:flex-none"
                   >
                     Cancel
                   </Button>
@@ -352,37 +353,40 @@ const SettingsPage = () => {
 
           {showSessions && (
             <>
-              <div className="flex justify-between items-center">
+              <div className="space-y-3">
                 <div className="text-sm text-gray-600">
                   {sessions.length} active session{sessions.length !== 1 ? 's' : ''}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button 
                     onClick={loadSessions} 
                     variant="outline" 
                     size="sm"
                     disabled={loadingSessions}
+                    className="flex-1 sm:flex-none"
                   >
                     <RefreshCw className={`h-4 w-4 ${loadingSessions ? 'animate-spin' : ''}`} />
-                    Refresh
+                    <span className="ml-1">Refresh</span>
                   </Button>
                   {sessions.length > 1 && (
                     <Button 
                       onClick={handleTerminateAllOtherSessions} 
                       variant="outline" 
                       size="sm"
-                      className="text-red-600 hover:text-red-700"
+                      className="text-red-600 hover:text-red-700 flex-1 sm:flex-none"
                     >
                       <LogOut className="h-4 w-4" />
-                      Terminate Others
+                      <span className="ml-1">Terminate Others</span>
                     </Button>
                   )}
                   <Button 
                     onClick={handleCancelAuth}
                     variant="outline" 
                     size="sm"
+                    className="flex-1 sm:flex-none"
                   >
-                    Hide Sessions
+                    <EyeOff className="h-4 w-4" />
+                    <span className="ml-1">Hide Sessions</span>
                   </Button>
                 </div>
               </div>
@@ -409,36 +413,37 @@ const SettingsPage = () => {
                           : 'border-gray-200 bg-gray-50'
                       }`}
                     >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <h4 className="font-medium text-gray-900">
+                      <div className="space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-medium text-gray-900 text-sm sm:text-base">
                               {formatDeviceInfo(session.device_info)}
                             </h4>
                             {session.is_current && (
-                              <Badge variant="default" className="bg-blue-100 text-blue-800">
+                              <Badge variant="default" className="bg-blue-100 text-blue-800 text-xs">
                                 Current Session
                               </Badge>
                             )}
                           </div>
-                          <div className="text-sm text-gray-600 space-y-1">
-                            <p>Created: {formatDate(session.created_at)}</p>
-                            <p>Expires: {formatDate(session.expires_at)}</p>
-                            <p className="text-xs text-gray-500">
-                              Session ID: {session.session_token.substring(0, 8)}...
-                            </p>
-                          </div>
+                          {!session.is_current && (
+                            <Button
+                              onClick={() => handleTerminateSession(session.session_token)}
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 self-start sm:self-auto"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              <span className="ml-1 sm:hidden">Terminate</span>
+                            </Button>
+                          )}
                         </div>
-                        {!session.is_current && (
-                          <Button
-                            onClick={() => handleTerminateSession(session.session_token)}
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
+                        <div className="text-sm text-gray-600 space-y-1">
+                          <p>Created: {formatDate(session.created_at)}</p>
+                          <p>Expires: {formatDate(session.expires_at)}</p>
+                          <p className="text-xs text-gray-500">
+                            Session ID: {session.session_token.substring(0, 8)}...
+                          </p>
+                        </div>
                       </div>
                     </div>
                   ))}
