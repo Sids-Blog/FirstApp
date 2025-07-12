@@ -2,12 +2,24 @@ import { useToast } from '@/hooks/use-toast'
 import { supabase } from '@/lib/supabase'
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react'
 
+interface Session {
+  id: string
+  session_token: string
+  device_info: string
+  created_at: string
+  expires_at: string
+  is_current: boolean
+}
+
 interface AuthContextType {
   isAuthenticated: boolean
   isLoading: boolean
   login: (accessKey: string) => Promise<boolean>
   logout: () => Promise<void>
   checkAuthStatus: () => Promise<void>
+  getActiveSessions: () => Promise<Session[]>
+  terminateSession: (sessionToken: string) => Promise<void>
+  terminateAllOtherSessions: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -179,6 +191,76 @@ export function AuthProvider({ children }: AuthProviderProps) {
     checkAuthStatus()
   }, [])
 
+  // Get all active sessions
+  const getActiveSessions = async (): Promise<Session[]> => {
+    try {
+      const { data: sessions, error } = await supabase
+        .from('auth_sessions')
+        .select('*')
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Error fetching sessions:', error)
+        return []
+      }
+
+      const currentToken = localStorage.getItem('auth_session_token')
+      return sessions?.map(session => ({
+        ...session,
+        is_current: session.session_token === currentToken
+      })) || []
+    } catch (error) {
+      console.error('Error fetching sessions:', error)
+      return []
+    }
+  }
+
+  // Terminate a specific session
+  const terminateSession = async (sessionToken: string): Promise<void> => {
+    try {
+      const { error } = await supabase
+        .from('auth_sessions')
+        .delete()
+        .eq('session_token', sessionToken)
+
+      if (error) {
+        console.error('Error terminating session:', error)
+        throw error
+      }
+
+      // If terminating current session, logout
+      const currentToken = localStorage.getItem('auth_session_token')
+      if (sessionToken === currentToken) {
+        await logout()
+      }
+    } catch (error) {
+      console.error('Error terminating session:', error)
+      throw error
+    }
+  }
+
+  // Terminate all other sessions (keep current)
+  const terminateAllOtherSessions = async (): Promise<void> => {
+    try {
+      const currentToken = localStorage.getItem('auth_session_token')
+      if (!currentToken) return
+
+      const { error } = await supabase
+        .from('auth_sessions')
+        .delete()
+        .neq('session_token', currentToken)
+
+      if (error) {
+        console.error('Error terminating other sessions:', error)
+        throw error
+      }
+    } catch (error) {
+      console.error('Error terminating other sessions:', error)
+      throw error
+    }
+  }
+
   // Clean up expired sessions periodically (optional)
   useEffect(() => {
     const cleanupExpiredSessions = async () => {
@@ -205,6 +287,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     login,
     logout,
     checkAuthStatus,
+    getActiveSessions,
+    terminateSession,
+    terminateAllOtherSessions,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

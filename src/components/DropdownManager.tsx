@@ -7,7 +7,7 @@ import { useData } from "@/lib/data-context";
 import { Briefcase, CreditCard, Plus, Tag, Trash2, Pencil, ArrowUp, ArrowDown, GripVertical } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useTransactions } from "@/lib/transaction-context";
-import { DndContext, closestCenter, useSensor, useSensors, PointerSensor, KeyboardSensor } from '@dnd-kit/core';
+import { DndContext, closestCenter, useSensor, useSensors, PointerSensor, KeyboardSensor, TouchSensor } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
@@ -23,10 +23,14 @@ function DraggableItem({ id, label, children }: { id: string, label: React.React
     background: isDragging ? '#f3f4f6' : undefined,
     borderRadius: 6,
     padding: '0.25rem 0.5rem',
+    minHeight: '2rem',
+    touchAction: 'none',
   };
   return (
     <span ref={setNodeRef} style={style} {...attributes}>
-      <span {...listeners} className="cursor-grab pr-1 text-gray-400 hover:text-gray-600"><GripVertical className="h-3 w-3" /></span>
+      <span {...listeners} className="cursor-grab pr-1 text-gray-400 hover:text-gray-600 touch-manipulation p-1 -m-1 rounded">
+        <GripVertical className="h-4 w-4 sm:h-3 sm:w-3" />
+      </span>
       {label}
       {children}
     </span>
@@ -71,6 +75,13 @@ const DropdownManager = () => {
 
   const sensors = useSensors(
     useSensor(PointerSensor),
+    useSensor(TouchSensor, {
+      // Delay before drag starts on touch devices
+      activationConstraint: {
+        delay: 200,
+        tolerance: 8,
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -196,7 +207,7 @@ const DropdownManager = () => {
                       <DraggableItem key={category} id={category} label={category}>
                         {editing && editing.type === 'expense' && editing.oldValue === category ? (
                           <>
-                            <Input size="sm" value={editValue} onChange={e => setEditValue(e.target.value)} className="w-24 inline-block" />
+                            <Input value={editValue} onChange={e => setEditValue(e.target.value)} className="w-24 inline-block h-8 text-sm" />
                             <Button size="sm" onClick={handleEditSave} className="ml-1">Save</Button>
                             <Button size="sm" variant="ghost" onClick={() => setEditing(null)} className="ml-1">Cancel</Button>
                           </>
@@ -241,7 +252,7 @@ const DropdownManager = () => {
                       <DraggableItem key={method} id={method} label={method}>
                         {editing && editing.type === 'payment' && editing.oldValue === method ? (
                           <>
-                            <Input size="sm" value={editValue} onChange={e => setEditValue(e.target.value)} className="w-24 inline-block" />
+                            <Input value={editValue} onChange={e => setEditValue(e.target.value)} className="w-24 inline-block h-8 text-sm" />
                             <Button size="sm" onClick={handleEditSave} className="ml-1">Save</Button>
                             <Button size="sm" variant="ghost" onClick={() => setEditing(null)} className="ml-1">Cancel</Button>
                           </>
@@ -286,7 +297,7 @@ const DropdownManager = () => {
                       <DraggableItem key={source} id={source} label={source}>
                         {editing && editing.type === 'income' && editing.oldValue === source ? (
                           <>
-                            <Input size="sm" value={editValue} onChange={e => setEditValue(e.target.value)} className="w-24 inline-block" />
+                            <Input value={editValue} onChange={e => setEditValue(e.target.value)} className="w-24 inline-block h-8 text-sm" />
                             <Button size="sm" onClick={handleEditSave} className="ml-1">Save</Button>
                             <Button size="sm" variant="ghost" onClick={() => setEditing(null)} className="ml-1">Cancel</Button>
                           </>

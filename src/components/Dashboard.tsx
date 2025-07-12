@@ -1,8 +1,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCurrency } from "@/lib/currency-context";
 import { useTransactions } from "@/lib/transaction-context";
-import { BarChart3, DollarSign, PieChart, TrendingDown, TrendingUp, Wallet } from "lucide-react";
-import { useMemo } from "react";
+import { BarChart3, DollarSign, PieChart, TrendingDown, TrendingUp, Wallet, Eye, EyeOff, CreditCard, PiggyBank } from "lucide-react";
+import { useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -29,6 +29,7 @@ const Dashboard = () => {
   const { transactions } = useTransactions();
   const { currency } = useCurrency();
   const { expenseCategories, incomeCategories, paymentMethods } = useData();
+  const [showSensitiveData, setShowSensitiveData] = useState(false);
 
   // FILTER STATES
   // Monthly Trend
@@ -56,7 +57,7 @@ const Dashboard = () => {
     }
   };
 
-  // Calculate statistics from real transaction data
+      // Calculate statistics from real transaction data
   const stats = useMemo(() => {
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
@@ -68,7 +69,7 @@ const Dashboard = () => {
              transactionDate.getFullYear() === currentYear;
     });
 
-    // Calculate totals
+    // Calculate totals for current month
     const totalIncome = currentMonthTransactions
       .filter(t => t.type === 'income')
       .reduce((sum, t) => sum + t.amount, 0);
@@ -78,6 +79,23 @@ const Dashboard = () => {
       .reduce((sum, t) => sum + t.amount, 0);
 
     const balance = totalIncome - totalExpenses;
+
+    // Calculate net available balance across all months
+    const allTimeIncome = transactions
+      .filter(t => t.type === 'income')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const allTimeExpenses = transactions
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const netAvailableBalance = allTimeIncome - allTimeExpenses;
+
+    // Calculate credit card spends for current month (payment methods starting with CC-)
+    const creditCardSpends = currentMonthTransactions
+      .filter(t => t.type === 'expense' && t.payment_method && 
+                   t.payment_method.startsWith('CC-'))
+      .reduce((sum, t) => sum + t.amount, 0);
 
     // Calculate category breakdown for expenses
     const expensesByCategory = currentMonthTransactions
@@ -102,6 +120,8 @@ const Dashboard = () => {
       totalExpenses,
       balance,
       transactionCount: currentMonthTransactions.length,
+      netAvailableBalance,
+      creditCardSpends,
       topCategories
     };
   }, [transactions]);
@@ -206,8 +226,8 @@ const Dashboard = () => {
         expenses: dayExpenses.reduce((sum, t) => sum + t.amount, 0)
       });
     }
-    // Payment method data (all time, filterable)
-    let paymentMethodTx = transactions.filter(t => t.payment_method);
+    // Payment method data (expense transactions only, filterable)
+    let paymentMethodTx = transactions.filter(t => t.payment_method && t.type === 'expense');
     if (paymentMethodFilter !== 'all') paymentMethodTx = paymentMethodTx.filter(t => t.payment_method === paymentMethodFilter);
     const paymentMethodData = paymentMethodTx.reduce((acc, t) => {
       const method = t.payment_method || 'Unknown';
@@ -251,6 +271,16 @@ const Dashboard = () => {
     })}`;
   };
 
+  const formatSensitiveAmount = (amount: number, showSign: boolean = false) => {
+    if (showSensitiveData) {
+      if (showSign) {
+        return `${amount >= 0 ? '+' : '-'}${formatAmount(amount)}`;
+      }
+      return formatAmount(amount);
+    }
+    return '••••••••';
+  };
+
   // Colors for charts
   const COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
 
@@ -273,8 +303,29 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
+      {/* Privacy Toggle */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => setShowSensitiveData(!showSensitiveData)}
+          className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+          title={showSensitiveData ? "Hide sensitive data" : "Show sensitive data"}
+        >
+          {showSensitiveData ? (
+            <>
+              <EyeOff className="h-4 w-4" />
+              Hide Financial Data
+            </>
+          ) : (
+            <>
+              <Eye className="h-4 w-4" />
+              Show Financial Data
+            </>
+          )}
+        </button>
+      </div>
+
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Income</CardTitle>
@@ -282,7 +333,7 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-emerald-600">
-              {formatAmount(stats.totalIncome)}
+              {formatSensitiveAmount(stats.totalIncome)}
             </div>
             <p className="text-xs text-muted-foreground">
               This month
@@ -312,7 +363,37 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${stats.balance >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-              {stats.balance >= 0 ? '+' : '-'}{formatAmount(stats.balance)}
+              {formatSensitiveAmount(stats.balance, true)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              This month
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Net Balance</CardTitle>
+            <PiggyBank className="h-4 w-4 text-purple-600" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${stats.netAvailableBalance >= 0 ? 'text-purple-600' : 'text-red-600'}`}>
+              {formatSensitiveAmount(stats.netAvailableBalance, true)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Across all months
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Credit Card Spends</CardTitle>
+            <CreditCard className="h-4 w-4 text-orange-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">
+              {formatAmount(stats.creditCardSpends)}
             </div>
             <p className="text-xs text-muted-foreground">
               This month
@@ -493,7 +574,7 @@ const Dashboard = () => {
         <Card>
           <CardHeader>
             <CardTitle>Payment Methods</CardTitle>
-            <CardDescription>Transaction amounts by payment method</CardDescription>
+            <CardDescription>Expense amounts by payment method</CardDescription>
             <div className="flex flex-wrap gap-2 mt-2 sm:flex-row flex-col items-center">
               <Select value={paymentMethodFilter} onValueChange={setPaymentMethodFilter}>
                 <SelectTrigger className="w-40"><SelectValue placeholder="All Methods" /></SelectTrigger>
