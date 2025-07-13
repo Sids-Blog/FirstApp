@@ -23,6 +23,7 @@ const ExpenseForm = () => {
   const [paymentMethod, setPaymentMethod] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fullySettled, setFullySettled] = useState(true);
 
   const getCurrencyIcon = () => {
     switch (currency) {
@@ -65,6 +66,7 @@ const ExpenseForm = () => {
         description,
         currency,
         payment_method: paymentMethod,
+        fullySettled, // new field
       });
 
       // Reset form
@@ -73,6 +75,7 @@ const ExpenseForm = () => {
       setDescription("");
       setPaymentMethod("");
       setDate(new Date().toISOString().split('T')[0]);
+      setFullySettled(true);
       
       toast({
         title: "Expense Added",
@@ -176,6 +179,20 @@ const ExpenseForm = () => {
               disabled={isFormDisabled}
                 rows={3}
               />
+            </div>
+            {/* Fully Settled Checkbox */}
+            <div className="flex items-center space-x-2">
+              <input
+                id="fully-settled"
+                type="checkbox"
+                checked={fullySettled}
+                onChange={e => setFullySettled(e.target.checked)}
+                disabled={isFormDisabled}
+                className="h-4 w-4"
+              />
+              <Label htmlFor="fully-settled" className="text-sm cursor-pointer">
+                Fully settled (Uncheck if Recovery needs to be done)
+              </Label>
             </div>
 
           <Button type="submit" className="w-full" disabled={isFormDisabled}>

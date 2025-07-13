@@ -555,13 +555,15 @@ const TransactionList = () => {
                             {getSortIcon('description', true)}
                           </div>
                         </th>
+                        {/* Settled column */}
+                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-gray-700">Settled</th>
                         <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {filteredExpenses.length === 0 ? (
                         <tr>
-                          <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                          <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                             <TrendingDown className="h-12 w-12 mx-auto mb-3 text-gray-300" />
                             <p className="text-lg font-medium">No expenses found</p>
                             <p className="text-sm">Add your first expense to get started!</p>
@@ -578,6 +580,14 @@ const TransactionList = () => {
                             <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-600">{transaction.payment_method || "-"}</td>
                             <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-600 max-w-[120px] sm:max-w-[150px] truncate" title={transaction.description || ""}>
                               {transaction.description ? (transaction.description.length > 20 ? `${transaction.description.substring(0, 20)}...` : transaction.description) : "-"}
+                            </td>
+                            {/* Settled cell */}
+                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm">
+                              {transaction.fullySettled === false ? (
+                                <span className="inline-block px-2 py-1 rounded bg-yellow-100 text-yellow-800 text-xs">No</span>
+                              ) : (
+                                <span className="inline-block px-2 py-1 rounded bg-green-100 text-green-800 text-xs">Yes</span>
+                              )}
                             </td>
                             <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
                               <div className="flex items-center justify-center gap-2">
@@ -803,8 +813,19 @@ const TransactionList = () => {
       </Tabs>
       <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
         <DialogContent>
-          <DialogHeader>
+          <DialogHeader className="flex flex-row items-center justify-between">
             <DialogTitle>Edit Transaction</DialogTitle>
+            <button
+              type="button"
+              aria-label="Close"
+              className="ml-auto text-gray-400 hover:text-gray-700 focus:outline-none"
+              onClick={() => {
+                setEditModalOpen(false);
+                setEditingTransaction(null);
+              }}
+            >
+              <X className="h-5 w-5" />
+            </button>
           </DialogHeader>
           {editingTransaction && (
             <form className="space-y-4" onSubmit={e => { e.preventDefault(); handleSaveEdit(); }}>
@@ -856,6 +877,21 @@ const TransactionList = () => {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+              )}
+              {/* Fully Settled Checkbox for expenses */}
+              {isExpense && (
+                <div className="flex items-center gap-2 mt-2">
+                  <input
+                    id="edit-fully-settled"
+                    type="checkbox"
+                    checked={editForm.fullySettled ?? true}
+                    onChange={e => handleEditFormChange('fullySettled', e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                  <Label htmlFor="edit-fully-settled" className="text-sm cursor-pointer">
+                    Fully settled (Uncheck if Recovery needs to be done)
+                  </Label>
                 </div>
               )}
               <DialogFooter>

@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCurrency } from "@/lib/currency-context";
 import { useTransactions } from "@/lib/transaction-context";
-import { BarChart3, DollarSign, PieChart, TrendingDown, TrendingUp, Wallet, Eye, EyeOff, CreditCard, PiggyBank } from "lucide-react";
+import { BarChart3, DollarSign, PieChart, TrendingDown, TrendingUp, Wallet, Eye, EyeOff, CreditCard, PiggyBank, AlertCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   Bar,
@@ -97,6 +97,11 @@ const Dashboard = () => {
                    t.payment_method.startsWith('CC-'))
       .reduce((sum, t) => sum + t.amount, 0);
 
+    // Calculate unsettled expenses for current month
+    const unsettledExpenses = currentMonthTransactions
+      .filter(t => t.type === 'expense' && t.fullySettled === false)
+      .reduce((sum, t) => sum + t.amount, 0);
+
     // Calculate category breakdown for expenses
     const expensesByCategory = currentMonthTransactions
       .filter(t => t.type === 'expense')
@@ -122,7 +127,8 @@ const Dashboard = () => {
       transactionCount: currentMonthTransactions.length,
       netAvailableBalance,
       creditCardSpends,
-      topCategories
+      topCategories,
+      unsettledExpenses // add to stats
     };
   }, [transactions]);
 
@@ -305,23 +311,24 @@ const Dashboard = () => {
     <div className="space-y-6">
       {/* Privacy Toggle */}
       <div className="flex justify-end">
-        <button
-          onClick={() => setShowSensitiveData(!showSensitiveData)}
-          className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-          title={showSensitiveData ? "Hide sensitive data" : "Show sensitive data"}
-        >
-          {showSensitiveData ? (
-            <>
-              <EyeOff className="h-4 w-4" />
-              Hide Financial Data
-            </>
-          ) : (
-            <>
-              <Eye className="h-4 w-4" />
-              Show Financial Data
-            </>
-          )}
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => setShowSensitiveData(!showSensitiveData)}
+              className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              title={showSensitiveData ? "Hide sensitive data" : "Show sensitive data"}
+            >
+              {showSensitiveData ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {showSensitiveData ? "Hide Financial Data" : "Show Financial Data"}
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Summary Cards */}
@@ -394,6 +401,21 @@ const Dashboard = () => {
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
               {formatAmount(stats.creditCardSpends)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              This month
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Unsettled Expenses</CardTitle>
+            <AlertCircle className="h-4 w-4 text-yellow-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-600">
+              {formatAmount(stats.unsettledExpenses)}
             </div>
             <p className="text-xs text-muted-foreground">
               This month

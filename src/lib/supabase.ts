@@ -19,6 +19,7 @@ export interface Transaction {
   category: string
   description?: string
   payment_method?: string
+  fullySettled?: boolean // Added for settled status
   created_at?: string
 }
 
