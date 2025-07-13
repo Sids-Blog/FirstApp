@@ -156,6 +156,8 @@ const TransactionList = () => {
   const [expenseSortDirection, setExpenseSortDirection] = useState<'asc' | 'desc' | null>('desc');
   const [incomeSortField, setIncomeSortField] = useState<keyof Transaction>('date');
   const [incomeSortDirection, setIncomeSortDirection] = useState<'asc' | 'desc' | null>('desc');
+  // Add settled filter state
+  const [settledFilter, setSettledFilter] = useState<'all' | 'settled' | 'unsettled'>('all');
 
   // Filter transactions into expenses and income
   const filteredExpenses = useMemo(() => {
@@ -168,11 +170,14 @@ const TransactionList = () => {
         const matchesCategory = expenseCategories.length === 0 || expenseCategories.includes(t.category);
         const matchesDate = !expenseDate || t.date === expenseDate;
         const matchesPayment = expensePaymentMethods.length === 0 || (t.payment_method && expensePaymentMethods.includes(t.payment_method));
-        return matchesSearch && matchesCategory && matchesDate && matchesPayment;
+        let matchesSettled = true;
+        if (settledFilter === 'settled') matchesSettled = t.fullySettled !== false;
+        if (settledFilter === 'unsettled') matchesSettled = t.fullySettled === false;
+        return matchesSearch && matchesCategory && matchesDate && matchesPayment && matchesSettled;
       });
     
     return sortTransactions(filtered, expenseSortField, expenseSortDirection);
-  }, [transactions, expenseSearch, expenseCategories, expenseDate, expensePaymentMethods, expenseSortField, expenseSortDirection]);
+  }, [transactions, expenseSearch, expenseCategories, expenseDate, expensePaymentMethods, expenseSortField, expenseSortDirection, settledFilter]);
 
   const filteredIncome = useMemo(() => {
     const filtered = transactions
@@ -279,7 +284,15 @@ const TransactionList = () => {
 
   function downloadCSVCombined(expenses: Transaction[], income: Transaction[], filename: string) {
     const all = [...expenses, ...income];
+    const now = new Date();
+    const dateStr = now.toLocaleString();
+    const expenseFilterSummary = `Expense Filters: Search='${expenseSearch || "-"}' | Category=${expenseCategories.length ? expenseCategories.join(", ") : "All"} | Date=${expenseDate || "All"} | Payment=${expensePaymentMethods.length ? expensePaymentMethods.join(", ") : "All"} | Settled=${settledFilter}`;
+    const incomeFilterSummary = `Income Filters: Search='${incomeSearch || "-"}' | Source=${incomeSources.length ? incomeSources.join(", ") : "All"} | Date=${incomeDate || "All"}`;
+
     const csvRows = [
+      [`Generated: ${dateStr}`],
+      [expenseFilterSummary],
+      [incomeFilterSummary],
       [
         "Date",
         "Type",
@@ -287,7 +300,9 @@ const TransactionList = () => {
         "Currency",
         "Category",
         "Description",
-        "Payment Method"
+        "Payment Method",
+        "Settled",
+        "ID"
       ],
       ...all.map(t => [
         t.date,
@@ -296,7 +311,9 @@ const TransactionList = () => {
         t.currency,
         t.category,
         t.description || "",
-        t.payment_method || ""
+        t.payment_method || "",
+        t.fullySettled === false ? "No" : "Yes",
+        t.id || ""
       ])
     ];
     const csvContent = csvRows.map(row => row.map(String).map(v => `"${v.replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -311,27 +328,53 @@ const TransactionList = () => {
 
   function downloadPDF(expenses: Transaction[], income: Transaction[], filename: string) {
     const doc = new jsPDF();
+    // Add generation date and filter summary at the top
+    const now = new Date();
+    const dateStr = now.toLocaleString();
+    let filterSummary = `Filters applied:`;
+    filterSummary += `\nExpenses:`;
+    filterSummary += ` Search: '${expenseSearch || "-"}'`;
+    filterSummary += ` | Category: ${expenseCategories.length ? expenseCategories.join(", ") : "All"}`;
+    filterSummary += ` | Date: ${expenseDate || "All"}`;
+    filterSummary += ` | Payment: ${expensePaymentMethods.length ? expensePaymentMethods.join(", ") : "All"}`;
+    filterSummary += ` | Settled: ${settledFilter}`;
+    filterSummary += `\nIncome:`;
+    filterSummary += ` Search: '${incomeSearch || "-"}'`;
+    filterSummary += ` | Source: ${incomeSources.length ? incomeSources.join(", ") : "All"}`;
+    filterSummary += ` | Date: ${incomeDate || "All"}`;
+
+    doc.setFontSize(10);
+    doc.text(`Generated: ${dateStr}`, 14, 10);
+    doc.setFontSize(9);
+    doc.text(filterSummary, 14, 16);
+
     // Expenses Table
+    let y = 30; // Add more space after filter summary
     doc.setFontSize(14);
-    doc.text('Expenses', 14, 16);
+    doc.text('Expenses', 14, y);
+    y += 4;
     autoTable(doc, {
-      startY: 20,
-      head: [["Date", "Amount", "Currency", "Category", "Description", "Payment Method"]],
+      startY: y,
+      head: [["Date", "Amount", "Currency", "Category", "Description", "Payment Method", "Settled"]],
       body: expenses.map(t => [
         t.date,
         t.amount,
         t.currency,
         t.category,
         t.description || "",
-        t.payment_method || ""
+        t.payment_method || "",
+        t.fullySettled === false ? "No" : "Yes"
       ]),
     });
+    // Get the Y position after the expenses table
+    const afterExpensesY = (doc as any).lastAutoTable.finalY || y + 10;
     // Income Table
-    let finalY = 30;
+    let incomeY = afterExpensesY + 10;
     doc.setFontSize(14);
-    doc.text('Income', 14, finalY);
+    doc.text('Income', 14, incomeY);
+    incomeY += 4;
     autoTable(doc, {
-      startY: finalY + 4,
+      startY: incomeY,
       head: [["Date", "Amount", "Currency", "Category", "Description", "Payment Method"]],
       body: income.map(t => [
         t.date,
@@ -488,12 +531,39 @@ const TransactionList = () => {
                       </div>
                     )}
                   </div>
+                  <div>
+                    <Label>Filter by Settled Status</Label>
+                    <div className="flex gap-2 mt-1">
+                      <Button
+                        variant={settledFilter === 'all' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setSettledFilter('all')}
+                      >
+                        All
+                      </Button>
+                      <Button
+                        variant={settledFilter === 'settled' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setSettledFilter('settled')}
+                      >
+                        Settled
+                      </Button>
+                      <Button
+                        variant={settledFilter === 'unsettled' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setSettledFilter('unsettled')}
+                      >
+                        Unsettled
+                      </Button>
+                    </div>
+                  </div>
                   <div className="flex justify-end">
                     <Button variant="ghost" size="sm" onClick={() => {
                       setExpenseSearch("");
                       setExpenseCategories([]);
                       setExpenseDate("");
                       setExpensePaymentMethods([]);
+                      setSettledFilter('all');
                     }}>Clear All Filters</Button>
                   </div>
                 </div>
@@ -556,7 +626,16 @@ const TransactionList = () => {
                           </div>
                         </th>
                         {/* Settled column */}
-                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-gray-700">Settled</th>
+                        <th 
+                          className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort('fullySettled', true)}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span className="hidden sm:inline">Settled</span>
+                            <span className="sm:hidden">Set</span>
+                            {getSortIcon('fullySettled', true)}
+                          </div>
+                        </th>
                         <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">Actions</th>
                       </tr>
                     </thead>
