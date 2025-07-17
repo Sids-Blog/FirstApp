@@ -33,6 +33,18 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* IST date/time above access key */}
+          <div className="mb-4 text-center text-xs text-gray-500">
+            {(() => {
+              const now = new Date();
+              const istOffset = 5.5 * 60 * 60 * 1000;
+              const ist = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + istOffset);
+              const pad = (n: number) => n.toString().padStart(2, '0');
+              const dateStr = `${pad(ist.getDate())}-${pad(ist.getMonth() + 1)}-${ist.getFullYear()}`;
+              const timeStr = `${pad(ist.getHours())}:${pad(ist.getMinutes())}:${pad(ist.getSeconds())}`;
+              return `${dateStr} ${timeStr} IST`;
+            })()}
+          </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="accessKey">Access Key</Label>

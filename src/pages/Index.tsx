@@ -7,13 +7,38 @@ import TransactionList from "@/components/TransactionList";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
+import { useTransactions } from "@/lib/transaction-context";
 import { BarChart3, List, LogOut, Plus, PlusCircle, Settings, TrendingDown, TrendingUp } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showFabMenu, setShowFabMenu] = useState(false);
   const { logout } = useAuth();
+  const { isOffline, isSyncing } = useTransactions();
+  const [lastSync, setLastSync] = useState<string | null>(null);
+  const lastSyncRef = useRef<string | null>(null);
+
+  // Update last sync time in localStorage when online and not syncing
+  useEffect(() => {
+    if (!isOffline && !isSyncing) {
+      const now = new Date();
+      const istOffset = 5.5 * 60 * 60 * 1000;
+      const ist = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + istOffset);
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      const dateStr = `${pad(ist.getDate())}-${pad(ist.getMonth() + 1)}-${ist.getFullYear()}`;
+      const timeStr = `${pad(ist.getHours())}:${pad(ist.getMinutes())}:${pad(ist.getSeconds())}`;
+      const syncStr = `${dateStr} ${timeStr} IST`;
+      localStorage.setItem('last_sync_ist', syncStr);
+      setLastSync(syncStr);
+      lastSyncRef.current = syncStr;
+    } else if (isOffline) {
+      // On going offline, read last sync from localStorage
+      const stored = localStorage.getItem('last_sync_ist');
+      setLastSync(stored);
+      lastSyncRef.current = stored;
+    }
+  }, [isOffline, isSyncing]);
 
   const handleLogout = async () => {
     await logout();
@@ -21,6 +46,22 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-blue-50">
+      {/* Offline/Sync Banner */}
+      {(isOffline || isSyncing) && (
+        <div className={`w-full text-center py-2 text-white ${isOffline ? 'bg-red-600' : 'bg-blue-600'}`}
+             style={{ zIndex: 1000 }}>
+          {isOffline ? (
+            <>
+              You are offline. Changes will sync when you are back online.
+              {lastSync && (
+                <div className="text-xs text-white/80 mt-1">Last sync: {lastSync}</div>
+              )}
+            </>
+          ) : (
+            'Syncing changes...'
+          )}
+        </div>
+      )}
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

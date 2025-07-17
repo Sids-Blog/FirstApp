@@ -87,9 +87,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       setIsLoading(true)
 
-      // Verify access key against environment variable
+      // Verify access key against environment variable + day
       const correctAccessKey = import.meta.env.VITE_ACCESS_KEY
-      if (!correctAccessKey) {
+      const today = new Date()
+      const day = today.getDate().toString()
+      const expectedKey = correctAccessKey ? `${correctAccessKey}${day}` : null
+      if (!expectedKey) {
         toast({
           title: "Configuration Error",
           description: "Access key not configured. Please contact administrator.",
@@ -98,7 +101,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return false
       }
 
-      if (accessKey !== correctAccessKey) {
+      if (accessKey !== expectedKey) {
         toast({
           title: "Invalid Access Key",
           description: "The access key you entered is incorrect.",

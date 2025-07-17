@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from './supabase';
+import { getItem, setItem, addToQueue, getQueue, clearQueue } from './utils';
 
 interface DataContextType {
   expenseCategories: string[];
@@ -12,6 +13,8 @@ interface DataContextType {
   addPaymentMethod: (method: string) => Promise<void>;
   removePaymentMethod: (method: string) => Promise<void>;
   isLoading: boolean;
+  isOffline: boolean;
+  isSyncing: boolean;
   error: string | null;
   refreshData: () => Promise<void>;
   updateCategoryOrder: (type: 'expense' | 'income', orderedNames: string[]) => Promise<void>;
@@ -33,156 +36,116 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [incomeCategories, setIncomeCategories] = useState<string[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load data from Supabase on mount
+  // Listen for online/offline events
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOffline(false);
+      syncQueue();
+    };
+    const handleOffline = () => {
+      setIsOffline(true);
+    };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Load data from local cache or Supabase
   useEffect(() => {
     refreshData();
+    // eslint-disable-next-line
   }, []);
 
   const refreshData = async () => {
     setIsLoading(true);
     setError(null);
-
     try {
-      // Load categories
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from('categories')
-        .select('*')
-        .order('order', { ascending: true });
-
-      if (categoriesError) throw categoriesError;
-
-      // Load payment methods
-      const { data: paymentMethodsData, error: paymentMethodsError } = await supabase
-        .from('payment_methods')
-        .select('*')
-        .order('order', { ascending: true });
-
-      if (paymentMethodsError) throw paymentMethodsError;
-
-      // Separate expense and income categories
-      const expenseCategories = categoriesData?.filter(c => c.type === 'expense').map(c => c.name) || [];
-      const incomeCategories = categoriesData?.filter(c => c.type === 'income').map(c => c.name) || [];
-      const paymentMethods = paymentMethodsData?.map(p => p.name) || [];
-
-      setExpenseCategories(expenseCategories);
-      setIncomeCategories(incomeCategories);
-      setPaymentMethods(paymentMethods);
-
-      console.log(`Loaded ${expenseCategories.length} expense categories, ${incomeCategories.length} income categories, ${paymentMethods.length} payment methods`);
+      if (!navigator.onLine) {
+        // Offline: load from local cache
+        const localCategories = await getItem<any[]>("categories");
+        const localPaymentMethods = await getItem<any[]>("payment_methods");
+        setExpenseCategories(localCategories?.filter(c => c.type === 'expense').map(c => c.name) || []);
+        setIncomeCategories(localCategories?.filter(c => c.type === 'income').map(c => c.name) || []);
+        setPaymentMethods(localPaymentMethods?.map(p => p.name) || []);
+        setIsOffline(true);
+      } else {
+        // Online: load from Supabase
+        const { data: categoriesData, error: categoriesError } = await supabase
+          .from('categories')
+          .select('*')
+          .order('order', { ascending: true });
+        if (categoriesError) throw categoriesError;
+        const { data: paymentMethodsData, error: paymentMethodsError } = await supabase
+          .from('payment_methods')
+          .select('*')
+          .order('order', { ascending: true });
+        if (paymentMethodsError) throw paymentMethodsError;
+        setExpenseCategories(categoriesData?.filter(c => c.type === 'expense').map(c => c.name) || []);
+        setIncomeCategories(categoriesData?.filter(c => c.type === 'income').map(c => c.name) || []);
+        setPaymentMethods(paymentMethodsData?.map(p => p.name) || []);
+        await setItem("categories", categoriesData || []);
+        await setItem("payment_methods", paymentMethodsData || []);
+        setIsOffline(false);
+      }
     } catch (error) {
-      console.error('Error loading data:', error);
       setError(error instanceof Error ? error.message : 'Failed to load data');
+      setIsOffline(true);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const addExpenseCategory = async (category: string) => {
-    if (!category.trim() || expenseCategories.includes(category)) return;
-
+  // Sync queued changes when back online
+  const syncQueue = async () => {
+    setIsSyncing(true);
     try {
-      const { error: supabaseError } = await supabase
-        .from('categories')
-        .insert([{ name: category, type: 'expense' }]);
-
-      if (supabaseError) throw supabaseError;
-
-      setExpenseCategories(prev => [...prev, category]);
-      console.log('Expense category added to Supabase');
-    } catch (error) {
-      console.error('Error adding expense category:', error);
-      setError(error instanceof Error ? error.message : 'Failed to add expense category');
-    }
-  };
-
-  const removeExpenseCategory = async (category: string) => {
-    try {
-      const { error: supabaseError } = await supabase
-        .from('categories')
-        .delete()
-        .eq('name', category)
-        .eq('type', 'expense');
-
-      if (supabaseError) throw supabaseError;
-
-      setExpenseCategories(prev => prev.filter(c => c !== category));
-      console.log('Expense category removed from Supabase');
-    } catch (error) {
-      console.error('Error removing expense category:', error);
-      setError(error instanceof Error ? error.message : 'Failed to remove expense category');
-    }
-  };
-
-  const addIncomeCategory = async (category: string) => {
-    if (!category.trim() || incomeCategories.includes(category)) return;
-
-    try {
-      const { error: supabaseError } = await supabase
-        .from('categories')
-        .insert([{ name: category, type: 'income' }]);
-
-      if (supabaseError) throw supabaseError;
-
-      setIncomeCategories(prev => [...prev, category]);
-      console.log('Income category added to Supabase');
-    } catch (error) {
-      console.error('Error adding income category:', error);
-      setError(error instanceof Error ? error.message : 'Failed to add income category');
-    }
-  };
-
-  const removeIncomeCategory = async (category: string) => {
-    try {
-      const { error: supabaseError } = await supabase
-        .from('categories')
-        .delete()
-        .eq('name', category)
-        .eq('type', 'income');
-
-      if (supabaseError) throw supabaseError;
-
-      setIncomeCategories(prev => prev.filter(c => c !== category));
-      console.log('Income category removed from Supabase');
-    } catch (error) {
-      console.error('Error removing income category:', error);
-      setError(error instanceof Error ? error.message : 'Failed to remove income category');
-    }
-  };
-
-  const addPaymentMethod = async (method: string) => {
-    if (!method.trim() || paymentMethods.includes(method)) return;
-
-    try {
-      const { error: supabaseError } = await supabase
-        .from('payment_methods')
-        .insert([{ name: method }]);
-
-      if (supabaseError) throw supabaseError;
-
-      setPaymentMethods(prev => [...prev, method]);
-      console.log('Payment method added to Supabase');
-    } catch (error) {
-      console.error('Error adding payment method:', error);
-      setError(error instanceof Error ? error.message : 'Failed to add payment method');
-    }
-  };
-
-  const removePaymentMethod = async (method: string) => {
-    try {
-      const { error: supabaseError } = await supabase
-        .from('payment_methods')
-        .delete()
-        .eq('name', method);
-
-      if (supabaseError) throw supabaseError;
-
-      setPaymentMethods(prev => prev.filter(m => m !== method));
-      console.log('Payment method removed from Supabase');
-    } catch (error) {
-      console.error('Error removing payment method:', error);
-      setError(error instanceof Error ? error.message : 'Failed to remove payment method');
+      let localCategories = (await getItem<any[]>("categories")) || [];
+      let localPaymentMethods = (await getItem<any[]>("payment_methods")) || [];
+      const queue = await getQueue();
+      for (const action of queue) {
+        if (action.entity === 'category') {
+          if (action.type === 'add') {
+            const { id, ...insertData } = action.data;
+            const { data, error } = await supabase.from('categories').insert([insertData]).select().single();
+            if (!error && data) {
+              localCategories = localCategories.filter(c => c.id !== id);
+              localCategories.push(data);
+              await setItem("categories", localCategories);
+            }
+          } else if (action.type === 'delete') {
+            await supabase.from('categories').delete().eq('id', action.id);
+            localCategories = localCategories.filter(c => c.id !== action.id);
+            await setItem("categories", localCategories);
+          }
+        } else if (action.entity === 'payment_method') {
+          if (action.type === 'add') {
+            const { id, ...insertData } = action.data;
+            const { data, error } = await supabase.from('payment_methods').insert([insertData]).select().single();
+            if (!error && data) {
+              localPaymentMethods = localPaymentMethods.filter(p => p.id !== id);
+              localPaymentMethods.push(data);
+              await setItem("payment_methods", localPaymentMethods);
+            }
+          } else if (action.type === 'delete') {
+            await supabase.from('payment_methods').delete().eq('id', action.id);
+            localPaymentMethods = localPaymentMethods.filter(p => p.id !== action.id);
+            await setItem("payment_methods", localPaymentMethods);
+          }
+        }
+      }
+      await clearQueue();
+      await refreshData();
+    } catch (e) {
+      // If sync fails, keep queue
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -219,6 +182,206 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // --- Category CRUD ---
+  const addExpenseCategory = async (category: string) => {
+    if (!category.trim() || expenseCategories.includes(category)) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      if (!navigator.onLine) {
+        // Offline: add to local cache and queue
+        const localCategories = (await getItem<any[]>("categories")) || [];
+        const tempId = `offline-cat-${Date.now()}`;
+        const newCat = { id: tempId, name: category, type: 'expense' };
+        await setItem("categories", [...localCategories, newCat]);
+        await addToQueue({ entity: 'category', type: 'add', data: newCat });
+        setExpenseCategories(prev => [...prev, category]);
+      } else {
+        // Online: add to Supabase and local cache
+        const { error: supabaseError, data } = await supabase
+          .from('categories')
+          .insert([{ name: category, type: 'expense' }])
+          .select()
+          .single();
+        if (supabaseError) throw supabaseError;
+        const localCategories = (await getItem<any[]>("categories")) || [];
+        await setItem("categories", [...localCategories, data]);
+        setExpenseCategories(prev => [...prev, category]);
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to add expense category');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const removeExpenseCategory = async (category: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      if (!navigator.onLine) {
+        // Offline: remove from local cache and queue
+        let localCategories = (await getItem<any[]>("categories")) || [];
+        const cat = localCategories.find(c => c.name === category && c.type === 'expense');
+        if (cat) {
+          localCategories = localCategories.filter(c => c.id !== cat.id);
+          await setItem("categories", localCategories);
+          await addToQueue({ entity: 'category', type: 'delete', id: cat.id });
+        }
+        setExpenseCategories(prev => prev.filter(c => c !== category));
+      } else {
+        // Online: remove from Supabase and local cache
+        const { error: supabaseError } = await supabase
+          .from('categories')
+          .delete()
+          .eq('name', category)
+          .eq('type', 'expense');
+        if (supabaseError) throw supabaseError;
+        let localCategories = (await getItem<any[]>("categories")) || [];
+        localCategories = localCategories.filter(c => !(c.name === category && c.type === 'expense'));
+        await setItem("categories", localCategories);
+        setExpenseCategories(prev => prev.filter(c => c !== category));
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to remove expense category');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // --- Income Category CRUD ---
+  const addIncomeCategory = async (category: string) => {
+    if (!category.trim() || incomeCategories.includes(category)) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      if (!navigator.onLine) {
+        // Offline: add to local cache and queue
+        const localCategories = (await getItem<any[]>("categories")) || [];
+        const tempId = `offline-cat-${Date.now()}`;
+        const newCat = { id: tempId, name: category, type: 'income' };
+        await setItem("categories", [...localCategories, newCat]);
+        await addToQueue({ entity: 'category', type: 'add', data: newCat });
+        setIncomeCategories(prev => [...prev, category]);
+      } else {
+        // Online: add to Supabase and local cache
+        const { error: supabaseError, data } = await supabase
+          .from('categories')
+          .insert([{ name: category, type: 'income' }])
+          .select()
+          .single();
+        if (supabaseError) throw supabaseError;
+        const localCategories = (await getItem<any[]>("categories")) || [];
+        await setItem("categories", [...localCategories, data]);
+        setIncomeCategories(prev => [...prev, category]);
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to add income category');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const removeIncomeCategory = async (category: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      if (!navigator.onLine) {
+        // Offline: remove from local cache and queue
+        let localCategories = (await getItem<any[]>("categories")) || [];
+        const cat = localCategories.find(c => c.name === category && c.type === 'income');
+        if (cat) {
+          localCategories = localCategories.filter(c => c.id !== cat.id);
+          await setItem("categories", localCategories);
+          await addToQueue({ entity: 'category', type: 'delete', id: cat.id });
+        }
+        setIncomeCategories(prev => prev.filter(c => c !== category));
+      } else {
+        // Online: remove from Supabase and local cache
+        const { error: supabaseError } = await supabase
+          .from('categories')
+          .delete()
+          .eq('name', category)
+          .eq('type', 'income');
+        if (supabaseError) throw supabaseError;
+        let localCategories = (await getItem<any[]>("categories")) || [];
+        localCategories = localCategories.filter(c => !(c.name === category && c.type === 'income'));
+        await setItem("categories", localCategories);
+        setIncomeCategories(prev => prev.filter(c => c !== category));
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to remove income category');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // --- Payment Method CRUD ---
+  const addPaymentMethod = async (method: string) => {
+    if (!method.trim() || paymentMethods.includes(method)) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      if (!navigator.onLine) {
+        // Offline: add to local cache and queue
+        const localPaymentMethods = (await getItem<any[]>("payment_methods")) || [];
+        const tempId = `offline-pay-${Date.now()}`;
+        const newPay = { id: tempId, name: method };
+        await setItem("payment_methods", [...localPaymentMethods, newPay]);
+        await addToQueue({ entity: 'payment_method', type: 'add', data: newPay });
+        setPaymentMethods(prev => [...prev, method]);
+      } else {
+        // Online: add to Supabase and local cache
+        const { error: supabaseError, data } = await supabase
+          .from('payment_methods')
+          .insert([{ name: method }])
+          .select()
+          .single();
+        if (supabaseError) throw supabaseError;
+        const localPaymentMethods = (await getItem<any[]>("payment_methods")) || [];
+        await setItem("payment_methods", [...localPaymentMethods, data]);
+        setPaymentMethods(prev => [...prev, method]);
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to add payment method');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const removePaymentMethod = async (method: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      if (!navigator.onLine) {
+        // Offline: remove from local cache and queue
+        let localPaymentMethods = (await getItem<any[]>("payment_methods")) || [];
+        const pay = localPaymentMethods.find(p => p.name === method);
+        if (pay) {
+          localPaymentMethods = localPaymentMethods.filter(p => p.id !== pay.id);
+          await setItem("payment_methods", localPaymentMethods);
+          await addToQueue({ entity: 'payment_method', type: 'delete', id: pay.id });
+        }
+        setPaymentMethods(prev => prev.filter(m => m !== method));
+      } else {
+        // Online: remove from Supabase and local cache
+        const { error: supabaseError } = await supabase
+          .from('payment_methods')
+          .delete()
+          .eq('name', method);
+        if (supabaseError) throw supabaseError;
+        let localPaymentMethods = (await getItem<any[]>("payment_methods")) || [];
+        localPaymentMethods = localPaymentMethods.filter(p => p.name !== method);
+        await setItem("payment_methods", localPaymentMethods);
+        setPaymentMethods(prev => prev.filter(m => m !== method));
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to remove payment method');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <DataContext.Provider value={{
       expenseCategories,
@@ -231,6 +394,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addPaymentMethod,
       removePaymentMethod,
       isLoading,
+      isOffline,
+      isSyncing,
       error,
       refreshData,
       updateCategoryOrder,
