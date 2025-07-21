@@ -22,6 +22,7 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs as UITabs, TabsList as UITabsList, TabsTrigger as UITabsTrigger, TabsContent as UITabsContent } from '@/components/ui/tabs';
 
 // Add at the top, after imports:
 interface BudgetTransaction {
@@ -1392,105 +1393,178 @@ const BudgetPage: React.FC = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                {showFilters && (
-                  <div className="bg-gray-50 rounded-lg p-4 mb-4 flex flex-col gap-4">
-                    <Input
-                      type="text"
-                      placeholder="Search comments..."
-                      value={listTabFilters.search}
-                      onChange={e => setListTabFilters(f => ({ ...f, search: e.target.value }))}
-                      className="w-full input-sm rounded border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition"
-                    />
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <div className="flex-1">
-                        <div className="font-semibold text-sm mb-1">Start Date</div>
-                        <Input type="date" placeholder="Start date" value={listTabFilters.startDate} onChange={e => setListTabFilters(f => ({ ...f, startDate: e.target.value }))} className="w-full input-sm rounded border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition" />
+                <UITabs defaultValue="budget" className="w-full mb-4">
+                  <UITabsList className="flex w-full mb-2 bg-gray-100 rounded-lg">
+                    <UITabsTrigger value="budget" className="flex-1">Budget</UITabsTrigger>
+                    <UITabsTrigger value="spend" className="flex-1">Spend</UITabsTrigger>
+                  </UITabsList>
+                  <UITabsContent value="budget">
+                    {/* Filter block and table for budget transactions only */}
+                    {showFilters && (
+                      <div className="bg-gray-50 rounded-lg p-4 mb-4 flex flex-col gap-4">
+                        <Input
+                          type="text"
+                          placeholder="Search comments..."
+                          value={listTabFilters.search}
+                          onChange={e => setListTabFilters(f => ({ ...f, search: e.target.value }))}
+                          className="w-full input-sm rounded border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition"
+                        />
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <div className="flex-1">
+                            <div className="font-semibold text-sm mb-1">Start Date</div>
+                            <Input type="date" placeholder="Start date" value={listTabFilters.startDate} onChange={e => setListTabFilters(f => ({ ...f, startDate: e.target.value }))} className="w-full input-sm rounded border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-semibold text-sm mb-1">End Date</div>
+                            <Input type="date" placeholder="End date" value={listTabFilters.endDate} onChange={e => setListTabFilters(f => ({ ...f, endDate: e.target.value }))} className="w-full input-sm rounded border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition" />
+                          </div>
+                        </div>
+                        <div>
+                          <div className="font-semibold text-sm mb-1">Filter by Category</div>
+                          <div className="max-h-32 overflow-y-auto bg-white rounded border p-2 flex flex-wrap gap-2">
+                            {allCategories.map(cat => (
+                              <label key={cat} className="flex items-center gap-2 text-sm w-1/2 sm:w-auto">
+                                <input type="checkbox" checked={listTabFilters.categories.includes(cat)} onChange={e => setListTabFilters(f => ({ ...f, categories: e.target.checked ? [...f.categories, cat] : f.categories.filter(c => c !== cat) }))} className="h-4 w-4" />
+                                <span className="truncate">{cat}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          onClick={() => setListTabFilters({ search: '', categories: [], startDate: '', endDate: '' })}
+                          className="mt-2 text-left w-full sm:w-auto text-sm font-normal bg-transparent shadow-none border-none text-gray-900 hover:bg-transparent hover:text-gray-900 focus:bg-transparent focus:text-gray-900 active:bg-transparent active:text-gray-900"
+                        >
+                          Clear All Filters
+                        </Button>
                       </div>
-                      <div className="flex-1">
-                        <div className="font-semibold text-sm mb-1">End Date</div>
-                        <Input type="date" placeholder="End date" value={listTabFilters.endDate} onChange={e => setListTabFilters(f => ({ ...f, endDate: e.target.value }))} className="w-full input-sm rounded border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition" />
-                      </div>
+                    )}
+                    <div className="w-full overflow-x-auto rounded-lg shadow-sm mb-4">
+                      <table className="min-w-[600px] w-full text-left rounded-xl shadow-md overflow-hidden border border-gray-200 bg-white text-xs sm:text-sm">
+                        <thead className="bg-gray-100 border-b-2 border-gray-200">
+                          <tr>
+                            <th className="py-2 px-2 min-w-[90px] font-semibold text-gray-700">Date</th>
+                            <th className="py-2 px-2 min-w-[110px] font-semibold text-gray-700">Month</th>
+                            <th className="py-2 px-2 min-w-[120px] font-semibold text-gray-700">Category</th>
+                            <th className="py-2 px-2 min-w-[90px] font-semibold text-gray-700">Amount</th>
+                            <th className="py-2 px-2 min-w-[120px] font-semibold text-gray-700">Comment</th>
+                            <th className="py-2 px-2 min-w-[80px] font-semibold text-gray-700">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sortedBudgetTransactions.length === 0 ? (
+                            <tr><td colSpan={7} className="text-center py-6 text-gray-400">No budget transactions yet.</td></tr>
+                          ) : (
+                            <>
+                              {sortedBudgetTransactions.map((tx, idx) => (
+                                <tr key={tx.id || idx} className="even:bg-gray-50 hover:bg-blue-50 transition-colors border-b last:border-b-0">
+                                  <td className="py-1.5 px-2 whitespace-nowrap">{tx.date || ''}</td>
+                                  <td className="py-1.5 px-2 whitespace-nowrap">{displayMonth(tx.month || '')}</td>
+                                  <td className="py-1.5 px-2 whitespace-nowrap">{tx.category || ''}</td>
+                                  <td className="py-1.5 px-2 whitespace-nowrap text-emerald-600">{typeof tx.amount === 'number' ? tx.amount.toFixed(2) : ''}</td>
+                                  <td className="py-1.5 px-2 whitespace-pre-line break-words max-w-[120px]">{tx.comment || ''}</td>
+                                  <td className="py-1.5 px-2">
+                                    <div className="flex gap-2 justify-center">
+                                      <button onClick={() => handleEditTransaction(tx)} className="text-blue-500 hover:text-blue-700 p-1 rounded focus:outline-none focus:ring-2 focus:ring-blue-400">
+                                        <SquarePen className="h-5 w-5" />
+                                      </button>
+                                      <button onClick={() => handleDeleteTransaction(tx)} className="text-red-500 hover:text-red-700 p-1 rounded focus:outline-none focus:ring-2 focus:ring-red-400">
+                                        <Trash className="h-5 w-5" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </>
+                          )}
+                        </tbody>
+                      </table>
                     </div>
-                    <div>
-                      <div className="font-semibold text-sm mb-1">Filter by Category</div>
-                      <div className="max-h-32 overflow-y-auto bg-white rounded border p-2 flex flex-wrap gap-2">
-                        {allCategories.map(cat => (
-                          <label key={cat} className="flex items-center gap-2 text-sm w-1/2 sm:w-auto">
-                            <input type="checkbox" checked={listTabFilters.categories.includes(cat)} onChange={e => setListTabFilters(f => ({ ...f, categories: e.target.checked ? [...f.categories, cat] : f.categories.filter(c => c !== cat) }))} className="h-4 w-4" />
-                            <span className="truncate">{cat}</span>
-                          </label>
-                        ))}
+                  </UITabsContent>
+                  <UITabsContent value="spend">
+                    {/* Filter block and table for spend transactions only */}
+                    {showFilters && (
+                      <div className="bg-gray-50 rounded-lg p-4 mb-4 flex flex-col gap-4">
+                        <Input
+                          type="text"
+                          placeholder="Search comments..."
+                          value={listTabFilters.search}
+                          onChange={e => setListTabFilters(f => ({ ...f, search: e.target.value }))}
+                          className="w-full input-sm rounded border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition"
+                        />
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <div className="flex-1">
+                            <div className="font-semibold text-sm mb-1">Start Date</div>
+                            <Input type="date" placeholder="Start date" value={listTabFilters.startDate} onChange={e => setListTabFilters(f => ({ ...f, startDate: e.target.value }))} className="w-full input-sm rounded border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-semibold text-sm mb-1">End Date</div>
+                            <Input type="date" placeholder="End date" value={listTabFilters.endDate} onChange={e => setListTabFilters(f => ({ ...f, endDate: e.target.value }))} className="w-full input-sm rounded border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition" />
+                          </div>
+                        </div>
+                        <div>
+                          <div className="font-semibold text-sm mb-1">Filter by Category</div>
+                          <div className="max-h-32 overflow-y-auto bg-white rounded border p-2 flex flex-wrap gap-2">
+                            {allCategories.map(cat => (
+                              <label key={cat} className="flex items-center gap-2 text-sm w-1/2 sm:w-auto">
+                                <input type="checkbox" checked={listTabFilters.categories.includes(cat)} onChange={e => setListTabFilters(f => ({ ...f, categories: e.target.checked ? [...f.categories, cat] : f.categories.filter(c => c !== cat) }))} className="h-4 w-4" />
+                                <span className="truncate">{cat}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          onClick={() => setListTabFilters({ search: '', categories: [], startDate: '', endDate: '' })}
+                          className="mt-2 text-left w-full sm:w-auto text-sm font-normal bg-transparent shadow-none border-none text-gray-900 hover:bg-transparent hover:text-gray-900 focus:bg-transparent focus:text-gray-900 active:bg-transparent active:text-gray-900"
+                        >
+                          Clear All Filters
+                        </Button>
                       </div>
+                    )}
+                    <div className="w-full overflow-x-auto rounded-lg shadow-sm mb-4">
+                      <table className="min-w-[600px] w-full text-left rounded-xl shadow-md overflow-hidden border border-gray-200 bg-white text-xs sm:text-sm">
+                        <thead className="bg-gray-100 border-b-2 border-gray-200">
+                          <tr>
+                            <th className="py-2 px-2 min-w-[90px] font-semibold text-gray-700">Date</th>
+                            <th className="py-2 px-2 min-w-[110px] font-semibold text-gray-700">Month</th>
+                            <th className="py-2 px-2 min-w-[120px] font-semibold text-gray-700">Category</th>
+                            <th className="py-2 px-2 min-w-[90px] font-semibold text-gray-700">Amount</th>
+                            <th className="py-2 px-2 min-w-[120px] font-semibold text-gray-700">Comment</th>
+                            <th className="py-2 px-2 min-w-[80px] font-semibold text-gray-700">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sortedSpendTransactions.length === 0 ? (
+                            <tr><td colSpan={7} className="text-center py-6 text-gray-400">No spend transactions yet.</td></tr>
+                          ) : (
+                            <>
+                              {sortedSpendTransactions.map((tx, idx) => (
+                                <tr key={tx.id || idx} className="even:bg-gray-50 hover:bg-blue-50 transition-colors border-b last:border-b-0">
+                                  <td className="py-1.5 px-2 whitespace-nowrap">{tx.date || ''}</td>
+                                  <td className="py-1.5 px-2 whitespace-nowrap">{displayMonth(tx.month || '')}</td>
+                                  <td className="py-1.5 px-2 whitespace-nowrap">{tx.category || ''}</td>
+                                  <td className="py-1.5 px-2 whitespace-nowrap text-red-600">{typeof tx.amount === 'number' ? tx.amount.toFixed(2) : ''}</td>
+                                  <td className="py-1.5 px-2 whitespace-pre-line break-words max-w-[120px]">{tx.comment || ''}</td>
+                                  <td className="py-1.5 px-2">
+                                    <div className="flex gap-2 justify-center">
+                                      <button onClick={() => handleEditTransaction(tx)} className="text-blue-500 hover:text-blue-700 p-1 rounded focus:outline-none focus:ring-2 focus:ring-blue-400">
+                                        <SquarePen className="h-5 w-5" />
+                                      </button>
+                                      <button onClick={() => handleDeleteTransaction(tx)} className="text-red-500 hover:text-red-700 p-1 rounded focus:outline-none focus:ring-2 focus:ring-red-400">
+                                        <Trash className="h-5 w-5" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </>
+                          )}
+                        </tbody>
+                      </table>
                     </div>
-                    <Button
-                      type="button"
-                      onClick={() => setListTabFilters({ search: '', categories: [], startDate: '', endDate: '' })}
-                      className="mt-2 text-left w-full sm:w-auto text-sm font-normal bg-transparent shadow-none border-none text-gray-900 hover:bg-transparent hover:text-gray-900 focus:bg-transparent focus:text-gray-900 active:bg-transparent active:text-gray-900"
-                    >
-                      Clear All Filters
-                    </Button>
-                  </div>
-                )}
-                <div className="w-full overflow-x-auto rounded-lg shadow-sm mb-4">
-                  <table className="min-w-[600px] w-full text-left rounded-xl shadow-md overflow-hidden border border-gray-200 bg-white text-xs sm:text-sm">
-                    <thead className="bg-gray-100 border-b-2 border-gray-200">
-                      <tr>
-                        <th className="py-2 px-2 min-w-[90px] font-semibold text-gray-700">Date</th>
-                        <th className="py-2 px-2 min-w-[110px] font-semibold text-gray-700">Month</th>
-                        <th className="py-2 px-2 min-w-[120px] font-semibold text-gray-700">Category</th>
-                        <th className="py-2 px-2 min-w-[90px] font-semibold text-gray-700">Amount</th>
-                        <th className="py-2 px-2 min-w-[120px] font-semibold text-gray-700">Comment</th>
-                        <th className="py-2 px-2 min-w-[80px] font-semibold text-gray-700">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sortedBudgetTransactions.length === 0 && sortedSpendTransactions.length === 0 ? (
-                        <tr><td colSpan={7} className="text-center py-6 text-gray-400">No transactions yet.</td></tr>
-                      ) : (
-                        <>
-                          {sortedBudgetTransactions.map((tx, idx) => (
-                            <tr key={tx.id || idx} className="even:bg-gray-50 hover:bg-blue-50 transition-colors border-b last:border-b-0">
-                              <td className="py-1.5 px-2 whitespace-nowrap">{tx.date || ''}</td>
-                              <td className="py-1.5 px-2 whitespace-nowrap">{displayMonth(tx.month || '')}</td>
-                              <td className="py-1.5 px-2 whitespace-nowrap">{tx.category || ''}</td>
-                              <td className="py-1.5 px-2 whitespace-nowrap text-emerald-600">{typeof tx.amount === 'number' ? tx.amount.toFixed(2) : ''}</td>
-                              <td className="py-1.5 px-2 whitespace-pre-line break-words max-w-[120px]">{tx.comment || ''}</td>
-                              <td className="py-1.5 px-2">
-                                <div className="flex gap-2 justify-center">
-                                  <button onClick={() => handleEditTransaction(tx)} className="text-blue-500 hover:text-blue-700 p-1 rounded focus:outline-none focus:ring-2 focus:ring-blue-400">
-                                    <SquarePen className="h-5 w-5" />
-                                  </button>
-                                  <button onClick={() => handleDeleteTransaction(tx)} className="text-red-500 hover:text-red-700 p-1 rounded focus:outline-none focus:ring-2 focus:ring-red-400">
-                                    <Trash className="h-5 w-5" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                          {sortedSpendTransactions.map((tx, idx) => (
-                            <tr key={tx.id || idx} className="even:bg-gray-50 hover:bg-blue-50 transition-colors border-b last:border-b-0">
-                              <td className="py-1.5 px-2 whitespace-nowrap">{tx.date || ''}</td>
-                              <td className="py-1.5 px-2 whitespace-nowrap">{displayMonth(tx.month || '')}</td>
-                              <td className="py-1.5 px-2 whitespace-nowrap">{tx.category || ''}</td>
-                              <td className="py-1.5 px-2 whitespace-nowrap text-red-600">{typeof tx.amount === 'number' ? tx.amount.toFixed(2) : ''}</td>
-                              <td className="py-1.5 px-2 whitespace-pre-line break-words max-w-[120px]">{tx.comment || ''}</td>
-                              <td className="py-1.5 px-2">
-                                <div className="flex gap-2 justify-center">
-                                  <button onClick={() => handleEditTransaction(tx)} className="text-blue-500 hover:text-blue-700 p-1 rounded focus:outline-none focus:ring-2 focus:ring-blue-400">
-                                    <SquarePen className="h-5 w-5" />
-                                  </button>
-                                  <button onClick={() => handleDeleteTransaction(tx)} className="text-red-500 hover:text-red-700 p-1 rounded focus:outline-none focus:ring-2 focus:ring-red-400">
-                                    <Trash className="h-5 w-5" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                  </UITabsContent>
+                </UITabs>
               </CardContent>
             </Card>
           </TabsContent>
