@@ -1392,6 +1392,45 @@ const BudgetPage: React.FC = () => {
                 </div>
               </CardHeader>
               <CardContent>
+                {showFilters && (
+                  <div className="bg-gray-50 rounded-lg p-4 mb-4 flex flex-col gap-4">
+                    <Input
+                      type="text"
+                      placeholder="Search comments..."
+                      value={listTabFilters.search}
+                      onChange={e => setListTabFilters(f => ({ ...f, search: e.target.value }))}
+                      className="w-full input-sm rounded border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition"
+                    />
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <div className="flex-1">
+                        <div className="font-semibold text-sm mb-1">Start Date</div>
+                        <Input type="date" placeholder="Start date" value={listTabFilters.startDate} onChange={e => setListTabFilters(f => ({ ...f, startDate: e.target.value }))} className="w-full input-sm rounded border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-semibold text-sm mb-1">End Date</div>
+                        <Input type="date" placeholder="End date" value={listTabFilters.endDate} onChange={e => setListTabFilters(f => ({ ...f, endDate: e.target.value }))} className="w-full input-sm rounded border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition" />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-sm mb-1">Filter by Category</div>
+                      <div className="max-h-32 overflow-y-auto bg-white rounded border p-2 flex flex-wrap gap-2">
+                        {allCategories.map(cat => (
+                          <label key={cat} className="flex items-center gap-2 text-sm w-1/2 sm:w-auto">
+                            <input type="checkbox" checked={listTabFilters.categories.includes(cat)} onChange={e => setListTabFilters(f => ({ ...f, categories: e.target.checked ? [...f.categories, cat] : f.categories.filter(c => c !== cat) }))} className="h-4 w-4" />
+                            <span className="truncate">{cat}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={() => setListTabFilters({ search: '', categories: [], startDate: '', endDate: '' })}
+                      className="mt-2 text-left w-full sm:w-auto text-sm font-normal bg-transparent shadow-none border-none text-gray-900 hover:bg-transparent hover:text-gray-900 focus:bg-transparent focus:text-gray-900 active:bg-transparent active:text-gray-900"
+                    >
+                      Clear All Filters
+                    </Button>
+                  </div>
+                )}
                 <div className="w-full overflow-x-auto rounded-lg shadow-sm mb-4">
                   <table className="min-w-[600px] w-full text-left rounded-xl shadow-md overflow-hidden border border-gray-200 bg-white text-xs sm:text-sm">
                     <thead className="bg-gray-100 border-b-2 border-gray-200">
