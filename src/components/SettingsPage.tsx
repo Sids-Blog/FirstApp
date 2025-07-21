@@ -10,12 +10,14 @@ import { useCurrency } from "@/lib/currency-context";
 import { useTransactions } from "@/lib/transaction-context";
 import { AlertCircle, CheckCircle, Database, DollarSign, Monitor, LogOut, Trash2, RefreshCw, EyeOff } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useNavigate } from 'react-router-dom';
 
 const SettingsPage = () => {
   const { currency, setCurrency } = useCurrency();
   const { isConnected, error, refreshTransactions } = useTransactions();
   const { getActiveSessions, terminateSession, terminateAllOtherSessions } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   
   const [sessions, setSessions] = useState<any[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
@@ -467,6 +469,17 @@ const SettingsPage = () => {
                 )}
               </>
             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Suite Apps</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => navigate('/budget')}>
+              Go to Budget Page
+            </Button>
           </CardContent>
         </Card>
       </div>

@@ -10,6 +10,8 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import Index from "./pages/Index";
 import LoginPage from "./pages/LoginPage";
 import NotFound from "./pages/NotFound";
+import BudgetPage from "./pages/BudgetPage";
+import ExpensePage from "./pages/ExpensePage";
 
 // Protected App Content - only shown when authenticated
 function ProtectedApp() {
@@ -38,6 +40,8 @@ function ProtectedApp() {
             <BrowserRouter>
               <Routes>
                 <Route path="/" element={<Index />} />
+                <Route path="/expense" element={<ExpensePage />} />
+                <Route path="/budget" element={<BudgetPage />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

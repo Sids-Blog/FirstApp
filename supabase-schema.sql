@@ -10,25 +10,29 @@ CREATE TABLE auth_sessions (
   expires_at TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '30 days')
 );
 
--- Transactions table
-CREATE TABLE transactions (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  date DATE NOT NULL,
-  type VARCHAR(10) NOT NULL CHECK (type IN ('expense', 'income')),
-  amount DECIMAL(10,2) NOT NULL,
-  currency VARCHAR(3) NOT NULL DEFAULT 'INR',
-  category VARCHAR(100) NOT NULL,
-  description TEXT,
-  payment_method VARCHAR(100),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+-- Tags Table
+create table if not exists tags (
+  id uuid primary key default gen_random_uuid(),
+  name text not null
 );
 
--- Categories table
-CREATE TABLE categories (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  name VARCHAR(100) NOT NULL UNIQUE,
-  type VARCHAR(10) NOT NULL CHECK (type IN ('expense', 'income')),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+-- Categories Table
+create table if not exists categories (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  tag_id uuid references tags(id) on delete set null,
+  default_value numeric default 0
+);
+
+-- Transactions Table
+create table if not exists transactions (
+  id uuid primary key default gen_random_uuid(),
+  date date not null,
+  month text not null,
+  category_id uuid references categories(id) on delete set null,
+  amount numeric not null,
+  comment text,
+  type text check (type in ('budget', 'spend')) not null
 );
 
 -- Payment methods table
@@ -82,3 +86,33 @@ CREATE INDEX idx_transactions_type ON transactions(type);
 CREATE INDEX idx_transactions_category ON transactions(category);
 CREATE INDEX idx_auth_sessions_token ON auth_sessions(session_token);
 CREATE INDEX idx_auth_sessions_expires ON auth_sessions(expires_at); 
+
+ALTER TABLE categoriesbudget ADD COLUMN IF NOT EXISTS "order" integer;
+-- Set default order for existing tags (parent_id is null)
+DO $$
+DECLARE
+  i integer := 0;
+  r RECORD;
+BEGIN
+  FOR r IN SELECT id FROM categoriesbudget WHERE parent_id IS NULL ORDER BY id LOOP
+    UPDATE categoriesbudget SET "order" = i WHERE id = r.id;
+    i := i + 1;
+  END LOOP;
+END $$; 
+
+ALTER TABLE categoriesbudget DROP COLUMN IF EXISTS category_order;
+-- Set order for all categories (parent_id is not null) to a unique, sequential value within each tag group
+DO $$
+DECLARE
+  tag_id uuid;
+  i integer;
+  r RECORD;
+BEGIN
+  FOR tag_id IN SELECT DISTINCT parent_id FROM categoriesbudget WHERE parent_id IS NOT NULL LOOP
+    i := 0;
+    FOR r IN SELECT id FROM categoriesbudget WHERE parent_id = tag_id ORDER BY id LOOP
+      UPDATE categoriesbudget SET "order" = i WHERE id = r.id;
+      i := i + 1;
+    END LOOP;
+  END LOOP;
+END $$; 
