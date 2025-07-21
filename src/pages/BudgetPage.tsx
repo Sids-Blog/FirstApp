@@ -21,6 +21,7 @@ import { useNavigate } from 'react-router-dom';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import html2canvas from 'html2canvas';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 // Add at the top, after imports:
 interface BudgetTransaction {
@@ -954,12 +955,11 @@ const BudgetPage: React.FC = () => {
                       color = 'text-yellow-700 bg-gradient-to-br from-yellow-100 to-yellow-50';
                       icon = <Wallet className="h-7 w-7 text-yellow-500" />;
                     } else {
+                      color = 'text-emerald-700 bg-gradient-to-br from-emerald-100 to-emerald-50';
                       icon = <PiggyBank className="h-7 w-7 text-emerald-500" />;
                     }
                     if (balance < 0) {
                       color = 'text-red-700 bg-gradient-to-br from-red-100 to-red-50';
-                    } else if (balance < 100 && tag?.name !== 'NoTag') {
-                      color = 'text-yellow-700 bg-gradient-to-br from-yellow-100 to-yellow-50';
                     }
                     return (
                       <Card
@@ -1201,15 +1201,16 @@ const BudgetPage: React.FC = () => {
                 onChange={e => setNewBudgetCategory(e.target.value)}
                 className="min-w-0 flex-grow border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition w-full sm:w-auto text-base"
               />
-              <select
-                value={newBudgetCategoryTag}
-                onChange={e => setNewBudgetCategoryTag(e.target.value)}
-                className="border border-gray-300 bg-white text-gray-900 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition w-full sm:w-auto text-base"
-              >
-                {budgetTags.map(tag => (
-                  <option key={tag.id} value={tag.id}>{tag.name}</option>
-                ))}
-              </select>
+              <Select value={newBudgetCategoryTag} onValueChange={setNewBudgetCategoryTag}>
+                <SelectTrigger className="border border-gray-300 bg-white text-gray-900 rounded px-2 py-1 text-base focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition w-full sm:w-auto">
+                  <SelectValue placeholder="Select tag" />
+                </SelectTrigger>
+                <SelectContent>
+                  {budgetTags.map(tag => (
+                    <SelectItem key={tag.id} value={tag.id}>{tag.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Input
                 type="number"
                 placeholder="Default Value"
@@ -1242,15 +1243,16 @@ const BudgetPage: React.FC = () => {
                                   onKeyDown={e => e.key === 'Enter' && handleSaveEditCategory()}
                                   style={{ margin: 0 }}
                                 />
-                                <select
-                                  value={editingCategoryTag}
-                                  onChange={e => setEditingCategoryTag(e.target.value)}
-                                  className="border border-gray-300 bg-white text-gray-900 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition w-full sm:w-auto text-base"
-                                >
-                                  {budgetTags.map(t => (
-                                    <option key={t.id} value={t.id}>{t.name}</option>
-                                  ))}
-                                </select>
+                                <Select value={editingCategoryTag} onValueChange={setEditingCategoryTag}>
+                                  <SelectTrigger className="border border-gray-300 bg-white text-gray-900 rounded px-2 py-1 text-base focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition w-full sm:w-auto">
+                                    <SelectValue placeholder="Select tag" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {budgetTags.map(tag => (
+                                      <SelectItem key={tag.id} value={tag.id}>{tag.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
                                 <Input
                                   type="number"
                                   placeholder="Default Value"
@@ -1312,15 +1314,16 @@ const BudgetPage: React.FC = () => {
                                   onKeyDown={e => e.key === 'Enter' && handleSaveEditCategory()}
                                   style={{ margin: 0 }}
                                 />
-                                <select
-                                  value={editingCategoryTag}
-                                  onChange={e => setEditingCategoryTag(e.target.value)}
-                                  className="border border-gray-300 bg-white text-gray-900 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition w-full sm:w-auto text-base"
-                                >
-                                  {budgetTags.map(t => (
-                                    <option key={t.id} value={t.id}>{t.name}</option>
-                                  ))}
-                                </select>
+                                <Select value={editingCategoryTag} onValueChange={setEditingCategoryTag}>
+                                  <SelectTrigger className="border border-gray-300 bg-white text-gray-900 rounded px-2 py-1 text-base focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition w-full sm:w-auto">
+                                    <SelectValue placeholder="Select tag" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {budgetTags.map(tag => (
+                                      <SelectItem key={tag.id} value={tag.id}>{tag.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
                                 <Input
                                   type="number"
                                   placeholder="Default Value"
@@ -1361,28 +1364,27 @@ const BudgetPage: React.FC = () => {
             )}
           </TabsContent>
           <TabsContent value="overview">
-            {/* Budget Overview UI (existing budget logic) */}
             <Card className="mb-6">
               <CardHeader>
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
                   <div className="flex items-center gap-2">
                     <ListIcon className="h-6 w-6" />
                     <h2 className="text-2xl font-bold">All Transactions</h2>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                     <Button
                       type="button"
                       onClick={handleExportCSV}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg border bg-blue-600 hover:bg-blue-700 text-white text-base font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      className="flex items-center justify-center gap-2 px-4 py-3 sm:py-2 rounded-lg border bg-blue-600 hover:bg-blue-700 text-white text-base font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-full sm:w-auto"
                     >
                       Export as CSV
                     </Button>
                     <Button
                       type="button"
                       onClick={() => setShowFilters(v => !v)}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg border bg-white text-black text-base font-medium shadow-sm hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      className="flex items-center justify-center gap-2 px-4 py-3 sm:py-2 rounded-lg border bg-white text-black text-base font-medium shadow-sm hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400 w-full sm:w-auto"
                     >
-                      <FilterIcon className="h-5 w-5 text-black" />
+                      <FilterIcon className="h-5 w-5 sm:h-5 sm:w-5 text-black" />
                       Filters
                       {showFilters ? <ChevronUp className="h-5 w-5 text-black" /> : <ChevronDown className="h-5 w-5 text-black" />}
                     </Button>
@@ -1390,129 +1392,66 @@ const BudgetPage: React.FC = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <Tabs defaultValue="budget" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 mb-4 sticky top-0 z-10 bg-white/90 backdrop-blur border-b rounded-b-lg">
-                    <TabsTrigger value="budget">
-                      <Wallet className="inline-block mr-2 h-5 w-5" />
-                      <span className="hidden sm:inline">Budget</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="spend">
-                      <TrendingDown className="inline-block mr-2 h-5 w-5" />
-                      <span className="hidden sm:inline">Spend</span>
-                    </TabsTrigger>
-                  </TabsList>
-                  {/* Move the filter bar here */}
-                  {showFilters && (
-                    <div className="bg-gray-50 rounded-lg p-4 mb-4 flex flex-col gap-4">
-                      <Input
-                        type="text"
-                        placeholder="Search comments..."
-                        value={listTabFilters.search}
-                        onChange={e => setListTabFilters(f => ({ ...f, search: e.target.value }))}
-                        className="w-full sm:w-auto input-sm rounded border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition"
-                      />
-                      <div>
-                        <div className="font-semibold text-sm mb-1">Filter by Date</div>
-                        <div className="flex gap-2">
-                          <Input type="date" placeholder="Start date" value={listTabFilters.startDate} onChange={e => setListTabFilters(f => ({ ...f, startDate: e.target.value }))} className="w-full sm:w-auto input-sm rounded border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition" />
-                          <Input type="date" placeholder="End date" value={listTabFilters.endDate} onChange={e => setListTabFilters(f => ({ ...f, endDate: e.target.value }))} className="w-full sm:w-auto input-sm rounded border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition" />
-                        </div>
-                      </div>
-                      <div>
-                        <div className="font-semibold text-sm mb-1">Filter by Category</div>
-                        <div className="max-h-32 overflow-y-auto bg-white rounded border p-2 flex flex-col gap-1">
-                          {allCategories.map(cat => (
-                            <label key={cat} className="flex items-center gap-2 text-sm">
-                              <input type="checkbox" checked={listTabFilters.categories.includes(cat)} onChange={e => setListTabFilters(f => ({ ...f, categories: e.target.checked ? [...f.categories, cat] : f.categories.filter(c => c !== cat) }))} />
-                              {cat}
-                            </label>
+                <div className="w-full overflow-x-auto rounded-lg shadow-sm mb-4">
+                  <table className="min-w-[600px] w-full text-left rounded-xl shadow-md overflow-hidden border border-gray-200 bg-white text-xs sm:text-sm">
+                    <thead className="bg-gray-100 border-b-2 border-gray-200">
+                      <tr>
+                        <th className="py-2 px-2 min-w-[90px] font-semibold text-gray-700">Date</th>
+                        <th className="py-2 px-2 min-w-[110px] font-semibold text-gray-700">Month</th>
+                        <th className="py-2 px-2 min-w-[120px] font-semibold text-gray-700">Category</th>
+                        <th className="py-2 px-2 min-w-[90px] font-semibold text-gray-700">Amount</th>
+                        <th className="py-2 px-2 min-w-[120px] font-semibold text-gray-700">Comment</th>
+                        <th className="py-2 px-2 min-w-[80px] font-semibold text-gray-700">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedBudgetTransactions.length === 0 && sortedSpendTransactions.length === 0 ? (
+                        <tr><td colSpan={7} className="text-center py-6 text-gray-400">No transactions yet.</td></tr>
+                      ) : (
+                        <>
+                          {sortedBudgetTransactions.map((tx, idx) => (
+                            <tr key={tx.id || idx} className="even:bg-gray-50 hover:bg-blue-50 transition-colors border-b last:border-b-0">
+                              <td className="py-1.5 px-2 whitespace-nowrap">{tx.date || ''}</td>
+                              <td className="py-1.5 px-2 whitespace-nowrap">{displayMonth(tx.month || '')}</td>
+                              <td className="py-1.5 px-2 whitespace-nowrap">{tx.category || ''}</td>
+                              <td className="py-1.5 px-2 whitespace-nowrap text-emerald-600">{typeof tx.amount === 'number' ? tx.amount.toFixed(2) : ''}</td>
+                              <td className="py-1.5 px-2 whitespace-pre-line break-words max-w-[120px]">{tx.comment || ''}</td>
+                              <td className="py-1.5 px-2">
+                                <div className="flex gap-2 justify-center">
+                                  <button onClick={() => handleEditTransaction(tx)} className="text-blue-500 hover:text-blue-700 p-1 rounded focus:outline-none focus:ring-2 focus:ring-blue-400">
+                                    <SquarePen className="h-5 w-5" />
+                                  </button>
+                                  <button onClick={() => handleDeleteTransaction(tx)} className="text-red-500 hover:text-red-700 p-1 rounded focus:outline-none focus:ring-2 focus:ring-red-400">
+                                    <Trash className="h-5 w-5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
                           ))}
-                        </div>
-                      </div>
-                      <Button
-                        type="button"
-                        onClick={() => setListTabFilters({ search: '', categories: [], startDate: '', endDate: '' })}
-                        className="mt-2 text-left w-auto text-sm font-normal bg-transparent shadow-none border-none text-gray-900 hover:bg-transparent hover:text-gray-900 focus:bg-transparent focus:text-gray-900 active:bg-transparent active:text-gray-900"
-                      >
-                        Clear All Filters
-                      </Button>
-                    </div>
-                  )}
-                  <TabsContent value="budget">
-                    <div className="overflow-x-auto rounded-lg shadow-sm mb-4">
-                      <table className="min-w-full rounded-xl shadow-md overflow-hidden border border-gray-200 bg-white">
-                        <thead className="bg-gray-100 border-b-2 border-gray-200">
-                          <tr>
-                            <th className="py-2 px-3 text-xs sm:text-sm font-semibold text-gray-700">Date</th>
-                            <th className="py-2 px-3 text-xs sm:text-sm font-semibold text-gray-700">Month</th>
-                            <th className="py-2 px-3 text-xs sm:text-sm font-semibold text-gray-700">Category</th>
-                            <th className="py-2 px-3 text-xs sm:text-sm font-semibold text-gray-700">Amount</th>
-                            <th className="py-2 px-3 text-xs sm:text-sm font-semibold text-gray-700">Comment</th>
-                            <th className="py-2 px-3 text-xs sm:text-sm font-semibold text-gray-700">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {sortedBudgetTransactions.length === 0 ? (
-                            <tr><td colSpan={7} className="text-center py-6 text-gray-400">No budget records yet.</td></tr>
-                          ) : (
-                            sortedBudgetTransactions.map((tx, idx) => (
-                              <tr key={tx.id} className="even:bg-gray-50 hover:bg-blue-50 transition-colors border-b last:border-b-0">
-                                <td className="py-1.5 px-3 text-xs sm:text-sm text-gray-900">{tx.date}</td>
-                                <td className="py-1.5 px-3 text-xs sm:text-sm text-gray-900">{displayMonth(tx.month)}</td>
-                                <td className="py-1.5 px-3 text-xs sm:text-sm text-gray-900">{tx.category}</td>
-                                <td className="py-1.5 px-3 text-xs sm:text-sm text-emerald-600">{tx.amount.toFixed(2)}</td>
-                                <td className="py-1.5 px-3 text-xs sm:text-sm text-gray-900">{tx.comment}</td>
-                                <td className="py-1.5 px-3 text-xs sm:text-sm text-gray-900">
-                                  <div className="flex gap-2 sm:gap-4 justify-center">
-                                    <button onClick={() => handleEditTransaction(tx)} className="text-blue-500 hover:text-blue-700 p-1"><SquarePen className="h-5 w-5" /></button>
-                                    <button onClick={() => handleDeleteTransaction(tx)} className="text-red-500 hover:text-red-700 p-1"><Trash className="h-5 w-5" /></button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="spend">
-                    <div className="overflow-x-auto rounded-lg shadow-sm mb-4">
-                      <table className="min-w-full rounded-xl shadow-md overflow-hidden border border-gray-200 bg-white">
-                        <thead className="bg-gray-100 border-b-2 border-gray-200">
-                          <tr>
-                            <th className="py-2 px-3 text-xs sm:text-sm font-semibold text-gray-700">Date</th>
-                            <th className="py-2 px-3 text-xs sm:text-sm font-semibold text-gray-700">Month</th>
-                            <th className="py-2 px-3 text-xs sm:text-sm font-semibold text-gray-700">Category</th>
-                            <th className="py-2 px-3 text-xs sm:text-sm font-semibold text-gray-700">Amount</th>
-                            <th className="py-2 px-3 text-xs sm:text-sm font-semibold text-gray-700">Comment</th>
-                            <th className="py-2 px-3 text-xs sm:text-sm font-semibold text-gray-700">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {sortedSpendTransactions.length === 0 ? (
-                            <tr><td colSpan={7} className="text-center py-6 text-gray-400">No spend records yet.</td></tr>
-                          ) : (
-                            sortedSpendTransactions.map((tx, idx) => (
-                              <tr key={tx.id} className="even:bg-gray-50 hover:bg-blue-50 transition-colors border-b last:border-b-0">
-                                <td className="py-1.5 px-3 text-xs sm:text-sm text-gray-900">{tx.date}</td>
-                                <td className="py-1.5 px-3 text-xs sm:text-sm text-gray-900">{displayMonth(tx.month)}</td>
-                                <td className="py-1.5 px-3 text-xs sm:text-sm text-gray-900">{tx.category}</td>
-                                <td className="py-1.5 px-3 text-xs sm:text-sm text-red-600">{tx.amount.toFixed(2)}</td>
-                                <td className="py-1.5 px-3 text-xs sm:text-sm text-gray-900">{tx.comment}</td>
-                                <td className="py-1.5 px-3 text-xs sm:text-sm text-gray-900">
-                                  <div className="flex gap-2 sm:gap-4 justify-center">
-                                    <button onClick={() => handleEditTransaction(tx)} className="text-blue-500 hover:text-blue-700 p-1"><SquarePen className="h-5 w-5" /></button>
-                                    <button onClick={() => handleDeleteTransaction(tx)} className="text-red-500 hover:text-red-700 p-1"><Trash className="h-5 w-5" /></button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </TabsContent>
-                </Tabs>
+                          {sortedSpendTransactions.map((tx, idx) => (
+                            <tr key={tx.id || idx} className="even:bg-gray-50 hover:bg-blue-50 transition-colors border-b last:border-b-0">
+                              <td className="py-1.5 px-2 whitespace-nowrap">{tx.date || ''}</td>
+                              <td className="py-1.5 px-2 whitespace-nowrap">{displayMonth(tx.month || '')}</td>
+                              <td className="py-1.5 px-2 whitespace-nowrap">{tx.category || ''}</td>
+                              <td className="py-1.5 px-2 whitespace-nowrap text-red-600">{typeof tx.amount === 'number' ? tx.amount.toFixed(2) : ''}</td>
+                              <td className="py-1.5 px-2 whitespace-pre-line break-words max-w-[120px]">{tx.comment || ''}</td>
+                              <td className="py-1.5 px-2">
+                                <div className="flex gap-2 justify-center">
+                                  <button onClick={() => handleEditTransaction(tx)} className="text-blue-500 hover:text-blue-700 p-1 rounded focus:outline-none focus:ring-2 focus:ring-blue-400">
+                                    <SquarePen className="h-5 w-5" />
+                                  </button>
+                                  <button onClick={() => handleDeleteTransaction(tx)} className="text-red-500 hover:text-red-700 p-1 rounded focus:outline-none focus:ring-2 focus:ring-red-400">
+                                    <Trash className="h-5 w-5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1582,11 +1521,16 @@ const BudgetPage: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Category</label>
-                  <select value={spendCategory} onChange={e => setSpendCategory(e.target.value)} className="w-full border border-gray-300 bg-white text-gray-900 rounded px-2 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition">
-                    {budgetCategories.map(cat => (
-                      <option key={cat.id} value={cat.name}>{cat.name}</option>
-                    ))}
-                  </select>
+                  <Select value={spendCategory} onValueChange={setSpendCategory}>
+                    <SelectTrigger className="w-full border border-gray-300 bg-white text-gray-900 rounded px-2 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition">
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {budgetCategories.map(cat => (
+                        <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <label className="flex items-center gap-1 font-semibold text-base mb-1">
@@ -1627,11 +1571,19 @@ const BudgetPage: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Category</label>
-                  <select value={editTxFields.category || ''} onChange={e => handleEditTxField('category', e.target.value)} className="w-full border border-gray-300 bg-white text-gray-900 rounded px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition">
-                    {allCategories.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
+                  <Select
+                    value={editTxFields.category || ''}
+                    onValueChange={val => handleEditTxField('category', val)}
+                  >
+                    <SelectTrigger className="w-full border border-gray-300 bg-white text-gray-900 rounded px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition">
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allCategories.map(cat => (
+                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Amount</label>
