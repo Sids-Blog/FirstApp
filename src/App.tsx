@@ -12,6 +12,7 @@ import LoginPage from "./pages/LoginPage";
 import NotFound from "./pages/NotFound";
 import BudgetPage from "./pages/BudgetPage";
 import ExpensePage from "./pages/ExpensePage";
+import AdminPage from "./pages/AdminPage";
 
 // Protected App Content - only shown when authenticated
 function ProtectedApp() {
@@ -42,6 +43,7 @@ function ProtectedApp() {
                 <Route path="/" element={<Index />} />
                 <Route path="/expense" element={<ExpensePage />} />
                 <Route path="/budget" element={<BudgetPage />} />
+                <Route path="/admin" element={<AdminPage />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

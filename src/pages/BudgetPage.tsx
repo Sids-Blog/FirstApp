@@ -21,6 +21,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs as UITabs, TabsList as UITabsList, TabsTrigger as UITabsTrigger, TabsContent as UITabsContent } from '@/components/ui/tabs';
+import { useCurrency } from '@/lib/currency-context';
 
 // Add at the top, after imports:
 interface BudgetTransaction {
@@ -92,7 +93,24 @@ interface BudgetTag {
 
 const COLORS = ['#22c55e', '#ef4444', '#eab308', '#3b82f6', '#8b5cf6', '#ec4899', '#f97316'];
 
+const getCurrencySymbol = (curr: string) => {
+  switch (curr) {
+    case 'USD': return '$';
+    case 'EUR': return '€';
+    case 'GBP': return '£';
+    case 'JPY': return '¥';
+    case 'CAD': return 'C$';
+    case 'AUD': return 'A$';
+    case 'INR': return '₹';
+    case 'CNY': return '¥';
+    case 'BRL': return 'R$';
+    case 'CHF': return 'Fr';
+    default: return '$';
+  }
+};
+
 const BudgetPage: React.FC = () => {
+  const { currency } = useCurrency();
   const { expenseCategories, incomeCategories } = useData();
   const { transactions } = useTransactions();
   const { toast } = useToast();
@@ -1003,11 +1021,11 @@ const BudgetPage: React.FC = () => {
                             <div className="grid grid-cols-2 gap-2">
                               <div>
                                 <div className="text-xs uppercase tracking-wider text-gray-600 font-medium">Budget</div>
-                                <div className="text-lg font-bold mt-0.5">₹{total.toFixed(2)}</div>
+                                <div className="text-lg font-bold mt-0.5">{getCurrencySymbol(currency)}{total.toFixed(2)}</div>
                               </div>
                               <div>
                                 <div className="text-xs uppercase tracking-wider text-gray-600 font-medium">Available</div>
-                                <div className="text-lg font-bold mt-0.5">₹{available.toFixed(2)}</div>
+                                <div className="text-lg font-bold mt-0.5">{getCurrencySymbol(currency)}{available.toFixed(2)}</div>
                               </div>
                             </div>
                           </div>
@@ -1080,11 +1098,11 @@ const BudgetPage: React.FC = () => {
                           <div className="grid grid-cols-2 gap-2">
                             <div>
                               <div className="text-xs uppercase tracking-wider text-gray-600 font-medium">Budget</div>
-                              <div className="text-lg font-bold mt-0.5">₹{totalBudget.toFixed(2)}</div>
+                              <div className="text-lg font-bold mt-0.5">{getCurrencySymbol(currency)}{totalBudget.toFixed(2)}</div>
                             </div>
                             <div>
                               <div className="text-xs uppercase tracking-wider text-gray-600 font-medium">Available</div>
-                              <div className="text-lg font-bold mt-0.5">₹{balance.toFixed(2)}</div>
+                              <div className="text-lg font-bold mt-0.5">{getCurrencySymbol(currency)}{balance.toFixed(2)}</div>
                             </div>
                           </div>
                         </div>
@@ -1139,7 +1157,7 @@ const BudgetPage: React.FC = () => {
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-lg font-semibold text-gray-700">Balance Distribution</CardTitle>
                     <div className="text-sm text-gray-500">
-                      Total Available: ₹{Object.values(availableBalances).reduce((sum, val) => sum + (val > 0 ? val : 0), 0).toFixed(2)}
+                      Total Available: {getCurrencySymbol(currency)}{Object.values(availableBalances).reduce((sum, val) => sum + (val > 0 ? val : 0), 0).toFixed(2)}
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -1166,11 +1184,11 @@ const BudgetPage: React.FC = () => {
                             tick={{ fontSize: 12 }}
                           />
                           <YAxis 
-                            tickFormatter={(value) => `₹${value}`}
+                            tickFormatter={(value) => `${getCurrencySymbol(currency)}${value}`}
                             tick={{ fontSize: 12 }}
                           />
                           <RechartsTooltip 
-                            formatter={(value: number) => [`₹${value.toFixed(2)}`, '']}
+                            formatter={(value: number) => [`${getCurrencySymbol(currency)}${value.toFixed(2)}`, '']}
                             labelStyle={{ color: '#374151' }}
                           />
                           <Legend />
@@ -1259,11 +1277,11 @@ const BudgetPage: React.FC = () => {
                         <div className="grid grid-cols-2 gap-2">
                           <div>
                             <div className="text-xs uppercase tracking-wider text-gray-600 font-medium">Allocated</div>
-                            <div className="text-lg font-bold mt-0.5">₹{allocated.toFixed(2)}</div>
+                            <div className="text-lg font-bold mt-0.5">{getCurrencySymbol(currency)}{allocated.toFixed(2)}</div>
                           </div>
                           <div>
                             <div className="text-xs uppercase tracking-wider text-gray-600 font-medium">Spent</div>
-                            <div className="text-lg font-bold mt-0.5">₹{spent.toFixed(2)}</div>
+                            <div className="text-lg font-bold mt-0.5">{getCurrencySymbol(currency)}{spent.toFixed(2)}</div>
                           </div>
                         </div>
                       </div>
@@ -1283,7 +1301,7 @@ const BudgetPage: React.FC = () => {
                           {allocated === 0 ? 'No budget set' : (
                             <span>
                               {Math.round((spent / allocated) * 100)}% used
-                              <span className="text-emerald-600 ml-1">• Available: ₹{available.toFixed(2)}</span>
+                              <span className="text-emerald-600 ml-1">• Available: {getCurrencySymbol(currency)}{available.toFixed(2)}</span>
                             </span>
                           )}
                         </div>
@@ -1305,7 +1323,7 @@ const BudgetPage: React.FC = () => {
                             <div className="font-bold text-base text-gray-900 mb-0.5 truncate">{tx.category}</div>
                             <div className="text-xs text-gray-500 mb-1">{tx.date}</div>
                           </div>
-                          <div className="text-red-600 font-bold text-lg mb-1">₹{tx.amount.toFixed(2)}</div>
+                          <div className="text-red-600 font-bold text-lg mb-1">{getCurrencySymbol(currency)}{tx.amount.toFixed(2)}</div>
                           <div className="text-xs text-gray-700 flex-1 w-full overflow-hidden break-words" style={{maxHeight: '2.5em'}}>{tx.comment}</div>
                         </div>
                       ))
@@ -1838,8 +1856,8 @@ const BudgetPage: React.FC = () => {
                   {budgetCategories.map(cat => (
                     <div key={cat.id} className="flex flex-col gap-1">
                       <label className="flex items-center gap-1 font-semibold text-base mb-1">
-                        <span className="text-xl">₹</span>
-                        {cat.name} <span className="font-normal text-gray-500">(₹)</span>
+                        <span className="text-xl">{getCurrencySymbol(currency)}</span>
+                        {cat.name} <span className="font-normal text-gray-500">({getCurrencySymbol(currency)})</span>
                       </label>
                       <Input type="number" step="0.01" min="0" placeholder="0.00" value={budgetAmounts[cat.name] || ''} onChange={e => setBudgetAmounts(a => ({ ...a, [cat.name]: parseFloat(e.target.value) }))} className="w-full border border-gray-300 bg-white text-gray-900 placeholder-gray-400 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition text-base" />
                     </div>
@@ -1892,8 +1910,8 @@ const BudgetPage: React.FC = () => {
                 </div>
                 <div>
                   <label className="flex items-center gap-1 font-semibold text-base mb-1">
-                    <span className="text-xl">₹</span>
-                    Amount <span className="font-normal text-gray-500">(₹)</span>
+                    <span className="text-xl">{getCurrencySymbol(currency)}</span>
+                    Amount <span className="font-normal text-gray-500">({getCurrencySymbol(currency)})</span>
                   </label>
                   <Input type="number" step="0.01" min="0" placeholder="0.00" value={spendAmount} onChange={e => setSpendAmount(e.target.value)} required className="w-full border border-gray-300 bg-white text-gray-900 placeholder-gray-400 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition text-base" />
                 </div>

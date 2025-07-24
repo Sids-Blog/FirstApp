@@ -117,22 +117,18 @@ const Index = () => {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 lg:w-fit">
-            <TabsTrigger value="dashboard" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
+          <TabsList className="mb-6 bg-gray-100 rounded-xl flex gap-1 p-1 justify-start">
+            <TabsTrigger value="dashboard" className="flex-1 font-semibold text-gray-700 rounded-lg px-3 py-2 transition-colors focus:outline-none data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-black data-[state=active]:font-bold hover:bg-white/70">
+              <BarChart3 className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Dashboard</span>
             </TabsTrigger>
-            <TabsTrigger value="transactions" className="flex items-center gap-2">
-              <List className="h-4 w-4" />
+            <TabsTrigger value="transactions" className="flex-1 font-semibold text-gray-700 rounded-lg px-3 py-2 transition-colors focus:outline-none data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-black data-[state=active]:font-bold hover:bg-white/70">
+              <List className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Transactions</span>
             </TabsTrigger>
-            <TabsTrigger value="categories" className="flex items-center gap-2">
-              <PlusCircle className="h-4 w-4" />
+            <TabsTrigger value="categories" className="flex-1 font-semibold text-gray-700 rounded-lg px-3 py-2 transition-colors focus:outline-none data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-black data-[state=active]:font-bold hover:bg-white/70">
+              <PlusCircle className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Categories</span>
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              <span className="hidden sm:inline">Settings</span>
             </TabsTrigger>
           </TabsList>
 
@@ -160,9 +156,6 @@ const Index = () => {
             <DropdownManager />
           </TabsContent>
 
-          <TabsContent value="settings" className="mt-6">
-            <SettingsPage />
-          </TabsContent>
         </Tabs>
       </main>
 
