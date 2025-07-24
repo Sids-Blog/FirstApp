@@ -16,7 +16,7 @@ export default defineConfig(({ mode }) => ({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'robots.txt', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Expense Harmony Symphony',
+        name: "Sid's personal finance",
         short_name: 'ExpenseApp',
         description: 'Personal budget tracker with offline support',
         theme_color: '#2563eb',

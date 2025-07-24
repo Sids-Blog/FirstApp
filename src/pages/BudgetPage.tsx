@@ -118,20 +118,29 @@ const BudgetPage: React.FC = () => {
   const navigate = useNavigate();
 
   // Budget-specific categories (local state, not shared)
+  // Budget-specific categories and tags state
   const [budgetCategories, setBudgetCategories] = useState<BudgetCategory[]>([]);
-  const [newBudgetCategory, setNewBudgetCategory] = useState('');
-  const [editingCategory, setEditingCategory] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState('');
-
   const [budgetTags, setBudgetTags] = useState<BudgetTag[]>([]);
+  
+  // New category state
+  const [newBudgetCategory, setNewBudgetCategory] = useState('');
+  const [newBudgetCategoryTag, setNewBudgetCategoryTag] = useState<string>('');
+  const [newBudgetCategoryDefault, setNewBudgetCategoryDefault] = useState<string>('');
+  
+  // New tag state
   const [newBudgetTag, setNewBudgetTag] = useState('');
+  
+  // Edit tag dialog state
+  const [editTagDialogOpen, setEditTagDialogOpen] = useState(false);
   const [editingTag, setEditingTag] = useState<string | null>(null);
   const [editTagValue, setEditTagValue] = useState('');
-
-  const [newBudgetCategoryTag, setNewBudgetCategoryTag] = useState<string>('');
-  const [editingCategoryTag, setEditingCategoryTag] = useState<string>('');
-  const [newBudgetCategoryDefault, setNewBudgetCategoryDefault] = useState<string>('');
-  const [editingCategoryDefault, setEditingCategoryDefault] = useState<string>('');
+  
+  // Edit category dialog state
+  const [editCatDialogOpen, setEditCatDialogOpen] = useState(false);
+  const [editingCat, setEditingCat] = useState<string | null>(null);
+  const [editCatName, setEditCatName] = useState('');
+  const [editCatTag, setEditCatTag] = useState('');
+  const [editCatDefaultAmount, setEditCatDefaultAmount] = useState('');
 
   // Drag-and-drop sensors
   const sensors = useSensors(
@@ -237,9 +246,53 @@ const BudgetPage: React.FC = () => {
     await fetchAllData();
     setEditingTag(null);
     setEditTagValue('');
+    setEditTagDialogOpen(false);
     toast({
       title: 'Tag Updated',
       description: 'Successfully updated tag.',
+    });
+  };
+
+  // Edit category
+  const handleSaveEditCategory = async () => {
+    if (!editingCat) return;
+    const oldCategory = budgetCategories.find(c => c.id === editingCat);
+    const newCatName = editCatName.trim();
+    
+    if (!oldCategory) return;
+
+    const { error } = await supabase.from('categoriesbudget')
+      .update({ 
+        name: newCatName,
+        parent_id: editCatTag || oldCategory.parent_id,
+        default_value: parseFloat(editCatDefaultAmount) || oldCategory.defaultValue || 0
+      })
+      .eq('id', editingCat);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to edit category: ' + error.message,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Update transactions if category name changed
+    if (oldCategory.name !== newCatName) {
+      await supabase.from('transactionsbudget')
+        .update({ category: newCatName })
+        .eq('category', oldCategory.name);
+    }
+
+    await fetchAllData();
+    setEditingCat(null);
+    setEditCatName('');
+    setEditCatTag('');
+    setEditCatDialogOpen(false);
+    toast({
+      title: 'Category Updated',
+      description: 'Successfully updated category.',
     });
   };
 
@@ -300,38 +353,7 @@ const BudgetPage: React.FC = () => {
     });
   };
 
-  // Edit category
-  const handleSaveEditCategory = async () => {
-    if (!editingCategory) return;
-    const oldCategory = budgetCategories.find(c => c.id === editingCategory)?.name;
-    const newCategoryName = editValue.trim();
-    const { error } = await supabase.from('categoriesbudget').update({
-      name: newCategoryName,
-      parent_id: editingCategoryTag || null,
-      default_value: parseFloat(editingCategoryDefault) || 0
-    }).eq('id', editingCategory);
-    if (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to edit category: ' + error.message,
-        variant: 'destructive',
-      });
-      return;
-    }
-    // Update all transactions with the old category name
-    if (oldCategory && oldCategory !== newCategoryName) {
-      await supabase.from('transactionsbudget').update({ category: newCategoryName }).eq('category', oldCategory);
-    }
-    await fetchAllData();
-    setEditingCategory(null);
-    setEditValue('');
-    setEditingCategoryTag('');
-    setEditingCategoryDefault('');
-    toast({
-      title: 'Category Updated',
-      description: 'Successfully updated category.',
-    });
-  };
+  
 
   // Delete category
   const handleRemoveBudgetCategory = async (id: string) => {
@@ -1397,21 +1419,10 @@ const BudgetPage: React.FC = () => {
                                 </div>
                               )}
                             >
-                              {editingTag === tag.id ? (
-                                <>
-                                  <Button size="sm" onClick={handleSaveEditTag} className="ml-1 flex items-center w-full sm:w-auto">
-                                    <Trophy className="h-4 w-4 mr-1 text-emerald-500" /> Save
-                                  </Button>
-                                  <Button size="sm" variant="ghost" onClick={() => setEditingTag(null)} className="ml-1 flex items-center w-full sm:w-auto">
-                                    <AlertTriangle className="h-4 w-4 mr-1 text-yellow-500" /> Cancel
-                                  </Button>
-                                </>
-                              ) : (
-                                <>
-                                  <button onClick={() => { setEditingTag(tag.id); setEditTagValue(tag.name); }} className="text-blue-500 hover:text-blue-700 flex items-center"><SquarePen className="h-3 w-3" /></button>
-                                  <button onClick={() => handleRemoveBudgetTag(tag.id)} className="text-red-500 hover:text-red-700 flex items-center"><Trash className="h-3 w-3" /></button>
-                                </>
-                              )}
+                              <>
+                                <button onClick={() => { setEditingTag(tag.id); setEditTagValue(tag.name); setEditTagDialogOpen(true); }} className="text-blue-500 hover:text-blue-700 flex items-center"><SquarePen className="h-3 w-3" /></button>
+                                <button onClick={() => handleRemoveBudgetTag(tag.id)} className="text-red-500 hover:text-red-700 flex items-center"><Trash className="h-3 w-3" /></button>
+                              </>
                             </DraggableItem>
                           );
                         })}
@@ -1498,55 +1509,27 @@ const BudgetPage: React.FC = () => {
                           <DraggableItem
                             key={cat.id}
                             id={cat.id}
-                            label={editingCategory === cat.id ? (
-                              <div className="flex flex-col sm:flex-row gap-2 items-center w-full">
-                                <Input
-                                  value={editValue}
-                                  onChange={e => setEditValue(e.target.value)}
-                                  className="min-w-0 flex-grow h-8 text-sm border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition flex items-center w-full sm:w-auto text-base"
-                                  onKeyDown={e => e.key === 'Enter' && handleSaveEditCategory()}
-                                  style={{ margin: 0 }}
-                                />
-                                <Select value={editingCategoryTag} onValueChange={setEditingCategoryTag}>
-                                  <SelectTrigger className="border border-gray-300 bg-white text-gray-900 rounded px-2 py-1 text-base focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition w-full sm:w-auto">
-                                    <SelectValue placeholder="Select tag" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {budgetTags.map(tag => (
-                                      <SelectItem key={tag.id} value={tag.id}>{tag.name}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <Input
-                                  type="number"
-                                  placeholder="Default Value"
-                                  value={editingCategoryDefault}
-                                  onChange={e => setEditingCategoryDefault(e.target.value)}
-                                  className="w-full sm:w-24 border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition text-base"
-                                />
-                              </div>
-                            ) : (
+                            label={
                               <div className="flex gap-2 items-center min-w-0">
                                 <span className="min-w-0 flex-grow h-8 text-sm flex items-center truncate">{cat.name}</span>
                                 <span className="text-xs text-gray-500 bg-gray-200 rounded px-2 py-0.5 ml-2">{budgetTags.find(t => t.id === cat.parent_id)?.name || 'No Tag'}</span>
                               </div>
-                            )}
+                            }
                           >
-                            {editingCategory === cat.id ? (
-                              <>
-                                <Button size="sm" onClick={handleSaveEditCategory} className="ml-1 flex items-center w-full sm:w-auto">
-                                  <Trophy className="h-4 w-4 mr-1 text-emerald-500" /> Save
-                                </Button>
-                                <Button size="sm" variant="ghost" onClick={() => setEditingCategory(null)} className="ml-1 flex items-center w-full sm:w-auto">
-                                  <AlertTriangle className="h-4 w-4 mr-1 text-yellow-500" /> Cancel
-                                </Button>
-                              </>
-                            ) : (
-                              <>
-                                <button onClick={() => { setEditingCategory(cat.id); setEditValue(cat.name); setEditingCategoryTag(cat.parent_id || ''); setEditingCategoryDefault(cat.defaultValue?.toString() || ''); }} className="text-blue-500 hover:text-blue-700 flex items-center"><SquarePen className="h-3 w-3" /></button>
-                                <button onClick={() => handleRemoveBudgetCategory(cat.id)} className="text-red-500 hover:text-red-700 flex items-center"><Trash className="h-3 w-3" /></button>
-                              </>
-                            )}
+                            <>
+                              <button onClick={() => {
+                                setEditingCat(cat.id);
+                                setEditCatName(cat.name);
+                                setEditCatTag(cat.parent_id || '');
+                                setEditCatDefaultAmount(cat.defaultValue?.toString() || '');
+                                setEditCatDialogOpen(true);
+                              }} className="text-blue-500 hover:text-blue-700 flex items-center">
+                                <SquarePen className="h-3 w-3" />
+                              </button>
+                              <button onClick={() => handleRemoveBudgetCategory(cat.id)} className="text-red-500 hover:text-red-700 flex items-center">
+                                <Trash className="h-3 w-3" />
+                              </button>
+                            </>
                           </DraggableItem>
                         ))}
                       </div>
@@ -1569,55 +1552,27 @@ const BudgetPage: React.FC = () => {
                           <DraggableItem
                             key={cat.id}
                             id={cat.id}
-                            label={editingCategory === cat.id ? (
-                              <div className="flex flex-col sm:flex-row gap-2 items-center w-full">
-                                <Input
-                                  value={editValue}
-                                  onChange={e => setEditValue(e.target.value)}
-                                  className="min-w-0 flex-grow h-8 text-sm border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition flex items-center w-full sm:w-auto text-base"
-                                  onKeyDown={e => e.key === 'Enter' && handleSaveEditCategory()}
-                                  style={{ margin: 0 }}
-                                />
-                                <Select value={editingCategoryTag} onValueChange={setEditingCategoryTag}>
-                                  <SelectTrigger className="border border-gray-300 bg-white text-gray-900 rounded px-2 py-1 text-base focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition w-full sm:w-auto">
-                                    <SelectValue placeholder="Select tag" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {budgetTags.map(tag => (
-                                      <SelectItem key={tag.id} value={tag.id}>{tag.name}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <Input
-                                  type="number"
-                                  placeholder="Default Value"
-                                  value={editingCategoryDefault}
-                                  onChange={e => setEditingCategoryDefault(e.target.value)}
-                                  className="w-full sm:w-24 border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition text-base"
-                                />
-                              </div>
-                            ) : (
+                            label={
                               <div className="flex gap-2 items-center min-w-0">
                                 <span className="min-w-0 flex-grow h-8 text-sm flex items-center truncate">{cat.name}</span>
                                 <span className="text-xs text-gray-500 bg-gray-200 rounded px-2 py-0.5 ml-2">{budgetTags.find(t => t.id === cat.parent_id)?.name || 'No Tag'}</span>
                               </div>
-                            )}
+                            }
                           >
-                            {editingCategory === cat.id ? (
-                              <>
-                                <Button size="sm" onClick={handleSaveEditCategory} className="ml-1 flex items-center w-full sm:w-auto">
-                                  <Trophy className="h-4 w-4 mr-1 text-emerald-500" /> Save
-                                </Button>
-                                <Button size="sm" variant="ghost" onClick={() => setEditingCategory(null)} className="ml-1 flex items-center w-full sm:w-auto">
-                                  <AlertTriangle className="h-4 w-4 mr-1 text-yellow-500" /> Cancel
-                                </Button>
-                              </>
-                            ) : (
-                              <>
-                                <button onClick={() => { setEditingCategory(cat.id); setEditValue(cat.name); setEditingCategoryTag(cat.parent_id || ''); setEditingCategoryDefault(cat.defaultValue?.toString() || ''); }} className="text-blue-500 hover:text-blue-700 flex items-center"><SquarePen className="h-3 w-3" /></button>
-                                <button onClick={() => handleRemoveBudgetCategory(cat.id)} className="text-red-500 hover:text-red-700 flex items-center"><Trash className="h-3 w-3" /></button>
-                              </>
-                            )}
+                            <>
+                              <button onClick={() => {
+                                setEditingCat(cat.id);
+                                setEditCatName(cat.name);
+                                setEditCatTag(cat.parent_id || '');
+                                setEditCatDefaultAmount(cat.defaultValue?.toString() || '');
+                                setEditCatDialogOpen(true);
+                              }} className="text-blue-500 hover:text-blue-700 flex items-center">
+                                <SquarePen className="h-3 w-3" />
+                              </button>
+                              <button onClick={() => handleRemoveBudgetCategory(cat.id)} className="text-red-500 hover:text-red-700 flex items-center">
+                                <Trash className="h-3 w-3" />
+                              </button>
+                            </>
                           </DraggableItem>
                         ))}
                       </div>
@@ -1972,6 +1927,94 @@ const BudgetPage: React.FC = () => {
                 <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end pt-4">
                   <Button type="submit" className="w-full sm:w-auto">Save</Button>
                   <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+                </DialogFooter>
+              </form>
+            </CardContent>
+          </Card>
+        </DialogContent>
+      </Dialog>
+      {/* Edit Tag Dialog */}
+      <Dialog open={editTagDialogOpen} onOpenChange={setEditTagDialogOpen}>
+        <DialogContent className="rounded-2xl shadow-2xl max-w-md w-full p-0 overflow-hidden animate-dialog-in">
+          <Card className="bg-white/95 border-0 shadow-none p-0">
+            <CardHeader className="p-6 pb-2">
+              <DialogTitle className="text-xl">Edit Tag</DialogTitle>
+            </CardHeader>
+            <CardContent className="p-6 pt-0 animate-fade-in">
+              <form onSubmit={e => { e.preventDefault(); handleSaveEditTag(); setEditTagDialogOpen(false); }} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Tag Name</label>
+                  <Input
+                    value={editTagValue}
+                    onChange={e => setEditTagValue(e.target.value)}
+                    className="w-full border border-gray-300 bg-white text-gray-900 placeholder-gray-400 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition text-base"
+                  />
+                </div>
+                <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end pt-4">
+                  <Button type="submit" className="w-full sm:w-auto">Save</Button>
+                  <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => {
+                    setEditTagDialogOpen(false);
+                    setEditingTag(null);
+                    setEditTagValue('');
+                  }}>Cancel</Button>
+                </DialogFooter>
+              </form>
+            </CardContent>
+          </Card>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Category Dialog */}
+      <Dialog open={editCatDialogOpen} onOpenChange={setEditCatDialogOpen}>
+        <DialogContent className="rounded-2xl shadow-2xl max-w-md w-full p-0 overflow-hidden animate-dialog-in">
+          <Card className="bg-white/95 border-0 shadow-none p-0">
+            <CardHeader className="p-6 pb-2">
+              <DialogTitle className="text-xl">Edit Category</DialogTitle>
+            </CardHeader>
+            <CardContent className="p-6 pt-0 animate-fade-in">
+              <form onSubmit={e => { e.preventDefault(); handleSaveEditCategory(); }} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Category Name</label>
+                  <Input
+                    value={editCatName}
+                    onChange={e => setEditCatName(e.target.value)}
+                    className="w-full border border-gray-300 bg-white text-gray-900 placeholder-gray-400 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition text-base"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Tag</label>
+                  <Select value={editCatTag} onValueChange={setEditCatTag}>
+                    <SelectTrigger className="w-full border border-gray-300 bg-white text-gray-900 rounded px-2 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition">
+                      <SelectValue placeholder="Select tag" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {budgetTags.map(tag => (
+                        <SelectItem key={tag.id} value={tag.id}>{tag.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Default Amount ({getCurrencySymbol(currency)})</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={editCatDefaultAmount}
+                    onChange={e => setEditCatDefaultAmount(e.target.value)}
+                    className="w-full border border-gray-300 bg-white text-gray-900 placeholder-gray-400 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition text-base"
+                  />
+                </div>
+                <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end pt-4">
+                  <Button type="submit" className="w-full sm:w-auto">Save</Button>
+                  <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => {
+                    setEditCatDialogOpen(false);
+                    setEditingCat(null);
+                    setEditCatName('');
+                    setEditCatTag('');
+                    setEditCatDefaultAmount('');
+                  }}>Cancel</Button>
                 </DialogFooter>
               </form>
             </CardContent>

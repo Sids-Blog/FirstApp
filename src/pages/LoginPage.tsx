@@ -29,7 +29,7 @@ export default function LoginPage() {
           </div>
           <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
           <CardDescription>
-            Enter your access key to continue to Expense Harmony Symphony
+            Enter your access key to continue
           </CardDescription>
         </CardHeader>
         <CardContent>
