@@ -8,19 +8,17 @@ import { Textarea } from '@/components/ui/textarea';
 import { DndContext, closestCenter, useSensor, useSensors, PointerSensor, KeyboardSensor, TouchSensor } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Pencil, Trash2, GripVertical, TrendingUp, TrendingDown, Wallet, Plus, BarChart3, Tag, List as ListIcon, PieChart as PieChartIcon, Trophy, AlertTriangle, Lock, Filter as FilterIcon, ChevronUp, ChevronDown, ChevronsUpDown, Banknote, HandCoins, PiggyBank, SquarePen, Trash, Home, LogOut } from 'lucide-react';
+import { Pencil, Trash2, GripVertical, TrendingUp, TrendingDown, Wallet, Plus, BarChart3, Tag, List as ListIcon, PieChart as PieChartIcon, Trophy, AlertTriangle, Lock, Filter as FilterIcon, ChevronUp, ChevronDown, ChevronsUpDown, Banknote, HandCoins, PiggyBank, SquarePen, Trash, Home, LogOut, FileText } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, Cell } from 'recharts';
 import { format, parse } from 'date-fns';
-import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
-import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
-import html2canvas from 'html2canvas';
+import autoTable from 'jspdf-autotable';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs as UITabs, TabsList as UITabsList, TabsTrigger as UITabsTrigger, TabsContent as UITabsContent } from '@/components/ui/tabs';
 
@@ -733,34 +731,95 @@ const BudgetPage: React.FC = () => {
 
   // Handler to export Month View as PDF
   async function handleExportMonthPDF() {
-    const pdf = new jsPDF('p', 'pt', 'a4');
+    const doc = new jsPDF();
     const month = displayMonth(monthView);
     const reportDate = format(new Date(), 'MMMM dd, yyyy, HH:mm:ss');
 
-    // Add title and report date
-    pdf.setFontSize(18);
-    pdf.text(`Budget Report: ${month}`, 40, 40);
-    pdf.setFontSize(12);
-    pdf.text(`Report generated: ${reportDate}`, 40, 60);
+    // Add title and report date at the top
+    doc.setFontSize(16);
+    doc.text(`Budget Report: ${month}`, 14, 20);
+    doc.setFontSize(10);
+    doc.text(`Report generated: ${reportDate}`, 14, 30);
 
-    // Capture score cards
-    const scoreCardsElem = document.getElementById('month-score-cards');
-    if (scoreCardsElem) {
-      const canvas = await html2canvas(scoreCardsElem, { scale: 2 });
-      const imgData = canvas.toDataURL('image/png');
-      pdf.addImage(imgData, 'PNG', 40, 80, 520, 120);
+    // Simple Category Summary Table
+    autoTable(doc, {
+      startY: 40,
+      head: [['Category', 'Allocated', 'Spent', 'Available', 'Used %']],
+      body: monthCategoryStats.map(stat => [
+        stat.cat,
+        stat.allocated.toFixed(2),
+        stat.spent.toFixed(2),
+        stat.available.toFixed(2),
+        stat.allocated === 0 ? '0' : Math.round((stat.spent / stat.allocated) * 100).toString()
+      ]),
+      styles: {
+        fontSize: 10,
+        cellPadding: 2
+      },
+      headStyles: {
+        fillColor: [200, 200, 200],
+        textColor: 0,
+        fontStyle: 'bold'
+      }
+    });
+
+    const finalY = (doc as any).lastAutoTable?.finalY || 40;
+
+    // Budget Transactions
+    if (monthBudgetTx.length > 0) {
+      doc.setFontSize(12);
+      doc.text('Budget Transactions', 14, finalY + 15);
+
+      autoTable(doc, {
+        startY: finalY + 20,
+        head: [['Date', 'Category', 'Amount', 'Comment']],
+        body: monthBudgetTx.map(tx => [
+          tx.date,
+          tx.category,
+          tx.amount.toFixed(2),
+          tx.comment || ''
+        ]),
+        styles: {
+          fontSize: 10,
+          cellPadding: 2
+        },
+        headStyles: {
+          fillColor: [200, 200, 200],
+          textColor: 0,
+          fontStyle: 'bold'
+        }
+      });
     }
 
-    // Capture activities
-    const activitiesElem = document.getElementById('month-activities');
-    let y = 220;
-    if (activitiesElem) {
-      const canvas = await html2canvas(activitiesElem, { scale: 2 });
-      const imgData = canvas.toDataURL('image/png');
-      pdf.addImage(imgData, 'PNG', 40, y, 520, 180);
+    const budgetFinalY = (doc as any).lastAutoTable?.finalY || finalY + 20;
+
+    // Spend Transactions
+    if (monthSpendTx.length > 0) {
+      doc.setFontSize(12);
+      doc.text('Spend Transactions', 14, budgetFinalY + 15);
+
+      autoTable(doc, {
+        startY: budgetFinalY + 20,
+        head: [['Date', 'Category', 'Amount', 'Comment']],
+        body: monthSpendTx.map(tx => [
+          tx.date,
+          tx.category,
+          tx.amount.toFixed(2),
+          tx.comment || ''
+        ]),
+        styles: {
+          fontSize: 10,
+          cellPadding: 2
+        },
+        headStyles: {
+          fillColor: [200, 200, 200],
+          textColor: 0,
+          fontStyle: 'bold'
+        }
+      });
     }
 
-    pdf.save(`Budget_Report_${month}.pdf`);
+    doc.save(`Budget_Report_${month}.pdf`);
   }
 
   const handleExportCSV = () => {
@@ -882,20 +941,20 @@ const BudgetPage: React.FC = () => {
       <main className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 mt-6">
         {/* All main content including Tabs goes here */}
         <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="mb-6 bg-gray-100 rounded-xl flex gap-1 pl-4 py-2 justify-start" onDragEnd={handleTagDragEnd}>
-            <TabsTrigger value="dashboard" className="font-semibold text-gray-700 rounded-lg px-4 py-2 transition-colors focus:outline-none data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-black data-[state=active]:font-bold hover:bg-white/70">
+          <TabsList className="mb-6 bg-gray-100 rounded-xl flex gap-1 p-1 justify-start" onDragEnd={handleTagDragEnd}>
+            <TabsTrigger value="dashboard" className="flex-1 font-semibold text-gray-700 rounded-lg px-3 py-2 transition-colors focus:outline-none data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-black data-[state=active]:font-bold hover:bg-white/70">
               <BarChart3 className="inline-block mr-2 h-5 w-5" />
               <span className="hidden sm:inline">Dashboard</span>
             </TabsTrigger>
-            <TabsTrigger value="monthview" className="font-semibold text-gray-700 rounded-lg px-4 py-2 transition-colors focus:outline-none data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-black data-[state=active]:font-bold hover:bg-white/70">
+            <TabsTrigger value="monthview" className="flex-1 font-semibold text-gray-700 rounded-lg px-3 py-2 transition-colors focus:outline-none data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-black data-[state=active]:font-bold hover:bg-white/70">
               <Wallet className="inline-block mr-2 h-5 w-5" />
               <span className="hidden sm:inline">Month View</span>
             </TabsTrigger>
-            <TabsTrigger value="categories" className="font-semibold text-gray-700 rounded-lg px-4 py-2 transition-colors focus:outline-none data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-black data-[state=active]:font-bold hover:bg-white/70">
+            <TabsTrigger value="categories" className="flex-1 font-semibold text-gray-700 rounded-lg px-3 py-2 transition-colors focus:outline-none data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-black data-[state=active]:font-bold hover:bg-white/70">
               <Tag className="inline-block mr-2 h-5 w-5" />
               <span className="hidden sm:inline">Category Management</span>
             </TabsTrigger>
-            <TabsTrigger value="overview" className="font-semibold text-gray-700 rounded-lg px-4 py-2 transition-colors focus:outline-none data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-black data-[state=active]:font-bold hover:bg-white/70">
+            <TabsTrigger value="overview" className="flex-1 font-semibold text-gray-700 rounded-lg px-3 py-2 transition-colors focus:outline-none data-[state=active]:bg-white data-[state=active]:shadow data-[state=active]:text-black data-[state=active]:font-bold hover:bg-white/70">
               <ListIcon className="inline-block mr-2 h-5 w-5" />
               <span className="hidden sm:inline">List</span>
             </TabsTrigger>
@@ -906,36 +965,63 @@ const BudgetPage: React.FC = () => {
               <div className="mb-4 text-lg font-semibold text-gray-700">Group wise Balance</div>
               {/* Tag Score Cards */}
               {sortedTags.length > 0 && (
-                <div className="mb-8 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 animate-fade-in">
+                <div className="mb-8 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 animate-fade-in">
                   {sortedTags.map(tag => {
-                    let color = 'text-blue-700 bg-gradient-to-br from-blue-100 to-blue-50';
-                    let icon;
+                    let color, bgGradient, iconColor, icon;
                     if (tag.name === 'NoTag') {
-                      color = 'text-yellow-700 bg-gradient-to-br from-yellow-100 to-yellow-50';
-                      icon = <Wallet className="h-7 w-7 text-yellow-500" />;
+                      color = 'text-amber-800';
+                      bgGradient = 'from-amber-50 via-amber-100/40 to-amber-50';
+                      iconColor = 'text-amber-600';
+                      icon = <Wallet className="h-8 w-8" />;
                     } else {
-                      color = 'text-blue-700 bg-gradient-to-br from-blue-100 to-blue-50';
-                      icon = <Banknote className="h-7 w-7 text-blue-500" />;
+                      color = 'text-blue-800';
+                      bgGradient = 'from-blue-50 via-blue-100/40 to-blue-50';
+                      iconColor = 'text-blue-600';
+                      icon = <Banknote className="h-8 w-8" />;
                     }
+                    const total = tagTotals.find(t => t.tag.id === tag.id)?.totalBudget || 0;
+                    const available = tagTotals.find(t => t.tag.id === tag.id)?.available || 0;
+                    
                     return (
                       <Card
                         key={tag.id}
-                        className={`flex flex-col justify-between p-2 rounded-2xl shadow-lg transition-all duration-200 transform hover:scale-[1.03] hover:shadow-2xl active:scale-95 ${color}`}
-                        style={{ minHeight: 130 }}
+                        className={`group flex flex-col justify-between p-4 rounded-2xl shadow-md transition-all duration-300 
+                          hover:shadow-xl hover:-translate-y-1 active:scale-[0.98] ${color} bg-gradient-to-br ${bgGradient}`}
+                        style={{ minHeight: 140 }}
                       >
-                        <div className="flex flex-row items-center justify-between">
-                          <div>
-                            <div className="text-base font-semibold sm:text-lg tracking-tight mb-1 animate-fade-in-slow">{tag.name}</div>
-                            <div className="text-xs text-gray-700">Total Budget</div>
-                            <div className="text-lg font-bold animate-fade-in-slow">{tagTotals.find(t => t.tag.id === tag.id)?.totalBudget.toFixed(2) || '0.00'}</div>
-                          </div>
-                          <div className="flex items-center justify-center w-16 h-16 rounded-full bg-white/90 shadow-inner animate-fade-in-slow">
-                            {icon}
+                        <div className="flex flex-row items-start justify-between">
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-3">
+                                <div className={`flex items-center justify-center w-9 h-9 rounded-xl bg-white/80 ${iconColor} transition-colors group-hover:bg-white`}>
+                                  {icon}
+                                </div>
+                                <div className="text-base font-semibold tracking-tight">{tag.name}</div>
+                              </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <div className="text-xs uppercase tracking-wider text-gray-600 font-medium">Budget</div>
+                                <div className="text-lg font-bold mt-0.5">₹{total.toFixed(2)}</div>
+                              </div>
+                              <div>
+                                <div className="text-xs uppercase tracking-wider text-gray-600 font-medium">Available</div>
+                                <div className="text-lg font-bold mt-0.5">₹{available.toFixed(2)}</div>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                        <div className="mt-2">
-                          <div className="text-xs text-gray-700">Available Balance</div>
-                          <div className="text-xl font-bold animate-fade-in-slow">{tagTotals.find(t => t.tag.id === tag.id)?.available.toFixed(2) || '0.00'}</div>
+                        <div className="mt-3">
+                          <div className="w-full h-2 bg-gray-200/50 rounded-full overflow-hidden">
+                            <div
+                              className={`h-2 rounded-full transition-all duration-300 bg-gradient-to-r ${iconColor}`}
+                              style={{ width: `${total > 0 ? Math.min(100, (available / total) * 100) : 0}%` }}
+                            />
+                          </div>
+                          <div className="text-xs text-gray-600 mt-2 font-medium">
+                            {total > 0 ? `${Math.round((available / total) * 100)}% available` : 'No budget set'}
+                          </div>
                         </div>
                       </Card>
                     );
@@ -945,42 +1031,74 @@ const BudgetPage: React.FC = () => {
               <div className="my-6 text-lg font-semibold text-gray-700">Category wise Balance</div>
               {/* Category Score Cards */}
               {orderedCategories.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-8 animate-fade-in">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8 animate-fade-in">
                   {orderedCategories.map(cat => {
                     const balance = availableBalances[cat.name] ?? 0;
                     const totalBudget = totalBudgetPerCategory[cat.name] ?? 0;
-                    let color = 'text-emerald-700 bg-gradient-to-br from-emerald-100 to-emerald-50';
-                    let icon;
                     const tag = budgetTags.find(t => t.id === cat.parent_id);
-                    if (tag?.name === 'NoTag') {
-                      color = 'text-yellow-700 bg-gradient-to-br from-yellow-100 to-yellow-50';
-                      icon = <Wallet className="h-7 w-7 text-yellow-500" />;
-                    } else {
-                      color = 'text-emerald-700 bg-gradient-to-br from-emerald-100 to-emerald-50';
-                      icon = <PiggyBank className="h-7 w-7 text-emerald-500" />;
-                    }
+                    
+                    let color, bgGradient, iconColor, icon, progressColor;
+                    
                     if (balance < 0) {
-                      color = 'text-red-700 bg-gradient-to-br from-red-100 to-red-50';
+                      color = 'text-red-800';
+                      bgGradient = 'from-red-50 via-red-100/40 to-red-50';
+                      iconColor = 'text-red-600';
+                      progressColor = 'from-red-400 to-red-600';
+                    } else if (tag?.name === 'NoTag') {
+                      color = 'text-amber-800';
+                      bgGradient = 'from-amber-50 via-amber-100/40 to-amber-50';
+                      iconColor = 'text-amber-600';
+                      progressColor = 'from-amber-400 to-amber-600';
+                      icon = <Wallet className="h-7 w-7" />;
+                    } else {
+                      color = 'text-emerald-800';
+                      bgGradient = 'from-emerald-50 via-emerald-100/40 to-emerald-50';
+                      iconColor = 'text-emerald-600';
+                      progressColor = 'from-emerald-400 to-emerald-600';
+                      icon = <PiggyBank className="h-7 w-7" />;
                     }
+
+                    const percentageUsed = totalBudget > 0 ? (totalBudget - balance) / totalBudget * 100 : 0;
+                    
                     return (
                       <Card
                         key={cat.id}
-                        className={`flex flex-col justify-between p-2 rounded-2xl shadow-lg transition-all duration-200 transform hover:scale-[1.03] hover:shadow-2xl active:scale-95 ${color}`}
-                        style={{ minHeight: 90 }}
+                        className={`group flex flex-col justify-between p-4 rounded-2xl shadow-md transition-all duration-300 
+                          hover:shadow-xl hover:-translate-y-1 active:scale-[0.98] ${color} bg-gradient-to-br ${bgGradient}`}
+                        style={{ minHeight: 140 }}
                       >
-                        <div className="flex flex-row items-center justify-between">
-                          <div>
-                            <div className="text-base font-semibold sm:text-lg tracking-tight mb-1 animate-fade-in-slow">{cat.name}</div>
-                            <div className="text-xs text-gray-700">Total Budget</div>
-                            <div className="text-lg font-bold animate-fade-in-slow">{totalBudget.toFixed(2)}</div>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <div className={`flex items-center justify-center w-9 h-9 rounded-xl bg-white/80 ${iconColor} transition-colors group-hover:bg-white`}>
+                                {icon}
+                              </div>
+                              <div className="text-base font-semibold tracking-tight">{cat.name}</div>
+                            </div>
                           </div>
-                          <div className="flex items-center justify-center w-16 h-16 rounded-full bg-white/90 shadow-inner animate-fade-in-slow">
-                            {icon}
+                          
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <div className="text-xs uppercase tracking-wider text-gray-600 font-medium">Budget</div>
+                              <div className="text-lg font-bold mt-0.5">₹{totalBudget.toFixed(2)}</div>
+                            </div>
+                            <div>
+                              <div className="text-xs uppercase tracking-wider text-gray-600 font-medium">Available</div>
+                              <div className="text-lg font-bold mt-0.5">₹{balance.toFixed(2)}</div>
+                            </div>
                           </div>
                         </div>
-                        <div className="mt-2">
-                          <div className="text-xs text-gray-700">Available Balance</div>
-                          <div className="text-xl font-bold animate-fade-in-slow">{balance.toFixed(2)}</div>
+                        
+                        <div className="mt-3">
+                          <div className="w-full h-2 bg-gray-200/50 rounded-full overflow-hidden">
+                            <div
+                              className={`h-2 rounded-full transition-all duration-300 bg-gradient-to-r ${progressColor}`}
+                              style={{ width: `${Math.min(100, percentageUsed)}%` }}
+                            />
+                          </div>
+                          <div className="text-xs text-gray-600 mt-2 font-medium">
+                            {percentageUsed > 0 ? `${Math.round(percentageUsed)}% used` : 'No spending yet'}
+                          </div>
                         </div>
                       </Card>
                     );
@@ -1015,33 +1133,59 @@ const BudgetPage: React.FC = () => {
                   </Button>
                 </div>
               )}
-              {/* Pie Chart for Category Balances */}
+              {/* Balance Distribution Chart */}
               {allCategories.length > 0 && (
                 <Card className="mb-6 rounded-2xl shadow-lg animate-fade-in-slow bg-gradient-to-br from-white to-blue-50">
-                  <CardHeader>
-                    <CardTitle>Balance Distribution</CardTitle>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-lg font-semibold text-gray-700">Balance Distribution</CardTitle>
+                    <div className="text-sm text-gray-500">
+                      Total Available: ₹{Object.values(availableBalances).reduce((sum, val) => sum + (val > 0 ? val : 0), 0).toFixed(2)}
+                    </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="h-64">
+                    <div className="h-80">
                       <ResponsiveContainer width="100%" height="100%">
-                        <RechartsPieChart>
-                          <Pie
-                            data={allCategories.map((cat, idx) => ({ name: cat, value: Math.max(availableBalances[cat] ?? 0, 0) }))}
-                            cx="50%"
-                            cy="50%"
-                            outerRadius={80}
-                            dataKey="value"
-                            label={({ name }) => name}
-                            isAnimationActive={true}
-                            animationDuration={800}
-                          >
-                            {allCategories.map((cat, idx) => (
-                              <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} />
-                            ))}
-                          </Pie>
-                          <RechartsTooltip />
+                        <BarChart
+                          data={allCategories
+                            .map(cat => ({
+                              name: cat,
+                              Available: Math.max(availableBalances[cat] ?? 0, 0),
+                              Total: totalBudgetPerCategory[cat] ?? 0
+                            }))
+                            .sort((a, b) => b.Available - a.Available)
+                            .slice(0, 8)} // Show top 8 categories
+                          margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+                          <XAxis 
+                            dataKey="name" 
+                            angle={-45}
+                            textAnchor="end"
+                            height={60}
+                            interval={0}
+                            tick={{ fontSize: 12 }}
+                          />
+                          <YAxis 
+                            tickFormatter={(value) => `₹${value}`}
+                            tick={{ fontSize: 12 }}
+                          />
+                          <RechartsTooltip 
+                            formatter={(value: number) => [`₹${value.toFixed(2)}`, '']}
+                            labelStyle={{ color: '#374151' }}
+                          />
                           <Legend />
-                        </RechartsPieChart>
+                          <Bar 
+                            dataKey="Total" 
+                            fill="#94a3b8" 
+                            opacity={0.3} 
+                            radius={[4, 4, 0, 0]}
+                          />
+                          <Bar 
+                            dataKey="Available" 
+                            fill="#3b82f6"
+                            radius={[4, 4, 0, 0]}
+                          />
+                        </BarChart>
                       </ResponsiveContainer>
                     </div>
                   </CardContent>
@@ -1051,15 +1195,23 @@ const BudgetPage: React.FC = () => {
           </TabsContent>
           <TabsContent value="monthview">
             <div className="w-full h-full p-2 sm:p-6">
-              <div className="mb-6 flex flex-col sm:flex-row gap-2 items-center">
-                <label className="text-sm font-medium">Select Month</label>
-                <Input
-                  type="month"
-                  value={monthView}
-                  onChange={e => setMonthView(e.target.value)}
-                  className="w-full sm:w-48 border border-gray-300 bg-white text-gray-900 placeholder-gray-400 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition text-base"
-                />
-                <Button onClick={handleExportMonthPDF} className="ml-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow text-sm font-semibold" type="button">
+              <div className="mb-6 space-y-3 sm:space-y-0 sm:flex sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                  <label className="text-sm font-medium text-gray-700">Select Month</label>
+                  <Input
+                    type="month"
+                    value={monthView}
+                    onChange={e => setMonthView(e.target.value)}
+                    className="w-full sm:w-48 px-3 py-2 bg-white border border-gray-200 rounded-xl shadow-sm 
+                      focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <Button 
+                  onClick={handleExportMonthPDF} 
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl shadow-sm text-sm font-semibold" 
+                  type="button"
+                >
+                  <FileText className="h-4 w-4" />
                   Export as PDF
                 </Button>
               </div>
@@ -1072,32 +1224,68 @@ const BudgetPage: React.FC = () => {
                   const allocated = stat.allocated;
                   const spent = stat.spent;
                   const available = stat.available;
-                  let color = 'text-emerald-700 bg-gradient-to-br from-emerald-100 to-emerald-50';
-                  if (tag?.name === 'NoTag') color = 'text-yellow-700 bg-gradient-to-br from-yellow-100 to-yellow-50';
-                  else if (allocated > 0 && spent > allocated) color = 'text-red-700 bg-gradient-to-br from-red-100 to-red-50';
-                  else if (allocated > 0 && spent / allocated > 0.8) color = 'text-yellow-700 bg-gradient-to-br from-yellow-100 to-yellow-50';
+                  let color;
+                  if (tag?.name === 'NoTag') {
+                    color = 'text-yellow-700 bg-gradient-to-br from-yellow-100 to-yellow-50';
+                  } else if (allocated > 0 && spent > allocated) {
+                    color = 'text-red-700 bg-gradient-to-br from-red-100 to-red-50';
+                  } else {
+                    color = 'text-emerald-700 bg-gradient-to-br from-emerald-100 to-emerald-50';
+                  }
                   return (
-                    <Card key={cat} className={`flex flex-col justify-between p-2 rounded-2xl shadow-lg transition-all duration-200 ${color}`} style={{ minHeight: 90 }}>
-                      <div className="flex flex-row items-center justify-between">
-                        <div>
-                          <div className="text-base font-semibold sm:text-lg tracking-tight mb-1">{cat}</div>
-                          <div className="text-xs text-gray-700">Allocated</div>
-                          <div className="text-lg font-bold">{allocated.toFixed(2)}</div>
+                    <Card
+                      key={cat}
+                      className={`group flex flex-col justify-between p-4 rounded-2xl shadow-md transition-all duration-300 
+                        hover:shadow-xl hover:-translate-y-1 active:scale-[0.98] ${color} bg-gradient-to-br ${
+                        tag?.name === 'NoTag' ? 'from-yellow-50 via-yellow-100/40 to-yellow-50' :
+                        spent > allocated ? 'from-red-50 via-red-100/40 to-red-50' :
+                        'from-emerald-50 via-emerald-100/40 to-emerald-50'}`}
+                      style={{ minHeight: 140 }}
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <div className={`flex items-center justify-center w-9 h-9 rounded-xl bg-white/80 transition-colors group-hover:bg-white ${
+                              tag?.name === 'NoTag' ? 'text-yellow-600' :
+                              spent > allocated ? 'text-red-600' :
+                              'text-emerald-600'
+                            }`}>
+                              <PiggyBank className="h-7 w-7" />
+                            </div>
+                            <div className="text-base font-semibold tracking-tight">{cat}</div>
+                          </div>
                         </div>
-                        <div className="flex flex-col items-end">
-                          <div className="text-xs text-gray-700">Spent</div>
-                          <div className="text-lg font-bold">{spent.toFixed(2)}</div>
+                        
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <div className="text-xs uppercase tracking-wider text-gray-600 font-medium">Allocated</div>
+                            <div className="text-lg font-bold mt-0.5">₹{allocated.toFixed(2)}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs uppercase tracking-wider text-gray-600 font-medium">Spent</div>
+                            <div className="text-lg font-bold mt-0.5">₹{spent.toFixed(2)}</div>
+                          </div>
                         </div>
                       </div>
-                      <div className="mt-2">
-                        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                      
+                      <div className="mt-3">
+                        <div className="w-full h-2 bg-gray-200/50 rounded-full overflow-hidden">
                           <div
-                            className={`h-2 rounded-full transition-all duration-300 ${allocated === 0 ? 'bg-gray-300' : spent > allocated ? 'bg-gradient-to-r from-red-400 to-red-600' : 'bg-gradient-to-r from-emerald-400 to-emerald-600'}`}
+                            className={`h-2 rounded-full transition-all duration-300 bg-gradient-to-r ${
+                              tag?.name === 'NoTag' ? 'from-yellow-400 to-yellow-600' :
+                              spent > allocated ? 'from-red-400 to-red-600' :
+                              'from-emerald-400 to-emerald-600'
+                            }`}
                             style={{ width: allocated === 0 ? '0%' : `${Math.min(100, (spent / allocated) * 100)}%` }}
                           />
                         </div>
-                        <div className="text-xs text-gray-600 mt-1">
-                          {allocated === 0 ? 'No budget set' : `${Math.round((spent / allocated) * 100)}% used, Available: ${available.toFixed(2)}`}
+                        <div className="text-xs text-gray-600 mt-2 font-medium">
+                          {allocated === 0 ? 'No budget set' : (
+                            <span>
+                              {Math.round((spent / allocated) * 100)}% used
+                              <span className="text-emerald-600 ml-1">• Available: ₹{available.toFixed(2)}</span>
+                            </span>
+                          )}
                         </div>
                       </div>
                     </Card>
