@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { DndContext, closestCenter, useSensor, useSensors, PointerSensor, KeyboardSensor, TouchSensor } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Pencil, Trash2, GripVertical, TrendingUp, TrendingDown, Wallet, Plus, BarChart3, Tag, List as ListIcon, PieChart as PieChartIcon, Trophy, AlertTriangle, Lock, Filter as FilterIcon, ChevronUp, ChevronDown, ChevronsUpDown, Banknote, HandCoins, PiggyBank, SquarePen, Trash, Home, LogOut, FileText } from 'lucide-react';
+import { Pencil, Trash2, GripVertical, TrendingUp, TrendingDown, Wallet, Plus, BarChart3, Tag, List as ListIcon, PieChart as PieChartIcon, Trophy, AlertTriangle, Lock, Filter as FilterIcon, ChevronUp, ChevronDown, ChevronsUpDown, Banknote, HandCoins, PiggyBank, SquarePen, Trash, Home, LogOut, FileText, Check, X } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, Cell } from 'recharts';
 import { format, parse } from 'date-fns';
@@ -1317,19 +1317,31 @@ const BudgetPage: React.FC = () => {
           </TabsContent>
           <TabsContent value="categories">
             {/* Tag Management UI */}
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle>Manage Tags</CardTitle>
+            <Card className="mb-6 bg-gradient-to-br from-white to-blue-50">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-3">
+                  <Tag className="h-6 w-6 text-blue-600" />
+                  <span>Manage Tags</span>
+                </CardTitle>
+                <p className="text-sm text-gray-500 mt-1">
+                  Create and organize tags to group your budget categories
+                </p>
               </CardHeader>
               <CardContent>
                 <form className="flex flex-col sm:flex-row gap-2 sm:gap-2 mb-4" onSubmit={e => { e.preventDefault(); handleAddBudgetTag(); }}>
-                  <Input
-                    placeholder="Add new tag..."
-                    value={newBudgetTag}
-                    onChange={e => setNewBudgetTag(e.target.value)}
-                    className="min-w-0 flex-grow border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition w-full sm:w-auto text-base"
-                  />
-                  <Button type="submit" className="w-full sm:w-auto">Add</Button>
+                  <div className="relative flex-grow">
+                    <Input
+                      placeholder="Add new tag..."
+                      value={newBudgetTag}
+                      onChange={e => setNewBudgetTag(e.target.value)}
+                      className="min-w-0 flex-grow border border-gray-300 bg-white/80 backdrop-blur-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition w-full sm:w-auto text-base pl-10"
+                    />
+                    <Tag className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  </div>
+                  <Button type="submit" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700">
+                    <Plus className="h-5 w-5 mr-2" />
+                    Add Tag
+                  </Button>
                 </form>
                 <div className="flex flex-wrap gap-2 overflow-x-auto pb-2">
                   <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleTagDragEnd}>
@@ -1348,14 +1360,23 @@ const BudgetPage: React.FC = () => {
                                   <Input
                                     value={editTagValue}
                                     onChange={e => setEditTagValue(e.target.value)}
-                                    className="w-24 h-8 text-sm border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition text-base"
+                                    className="w-32 h-8 text-sm border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition text-base"
                                     onKeyDown={e => e.key === 'Enter' && handleSaveEditTag()}
                                   />
-                                  <Button size="sm" onClick={handleSaveEditTag}>Save</Button>
-                                  <Button size="sm" variant="ghost" onClick={() => setEditingTag(null)}>Cancel</Button>
+                                  <div className="flex gap-1 ml-2">
+                                    <Button size="sm" onClick={handleSaveEditTag} className="bg-blue-600 hover:bg-blue-700">
+                                      <Check className="h-4 w-4" />
+                                    </Button>
+                                    <Button size="sm" variant="ghost" onClick={() => setEditingTag(null)} className="text-gray-500">
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
                                 </>
                               ) : (
-                                <span className="text-sm font-medium">{tag.name}</span>
+                                <div className="flex items-center gap-2">
+                                  <Tag className="h-4 w-4 text-blue-600" />
+                                  <span className="text-sm font-medium">{tag.name}</span>
+                                </div>
                               )}
                             >
                               {editingTag === tag.id ? (
@@ -1383,42 +1404,78 @@ const BudgetPage: React.FC = () => {
               </CardContent>
             </Card>
             {/* Add Category Form (with tag selector) - mobile friendly */}
-            <form className="flex flex-col sm:flex-row gap-2 sm:gap-2 mb-6" onSubmit={e => { e.preventDefault(); handleAddBudgetCategory(); }}>
-              <Input
-                placeholder="Add new budget category..."
-                value={newBudgetCategory}
-                onChange={e => setNewBudgetCategory(e.target.value)}
-                className="min-w-0 flex-grow border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition w-full sm:w-auto text-base"
-              />
-              <Select value={newBudgetCategoryTag} onValueChange={setNewBudgetCategoryTag}>
-                <SelectTrigger className="border border-gray-300 bg-white text-gray-900 rounded px-2 py-1 text-base focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition w-full sm:w-auto">
-                  <SelectValue placeholder="Select tag" />
-                </SelectTrigger>
-                <SelectContent>
-                  {budgetTags.map(tag => (
-                    <SelectItem key={tag.id} value={tag.id}>{tag.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Input
-                type="number"
-                placeholder="Default Value"
-                value={newBudgetCategoryDefault}
-                onChange={e => setNewBudgetCategoryDefault(e.target.value)}
-                className="w-full sm:w-24 border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition text-base"
-              />
-              <Button type="submit" className="w-full sm:w-auto">Add</Button>
-            </form>
+            <Card className="mb-6 bg-gradient-to-br from-white to-emerald-50">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-emerald-100">
+                    <Plus className="h-5 w-5 text-emerald-600" />
+                  </div>
+                  <span>Add New Category</span>
+                </CardTitle>
+                <p className="text-sm text-gray-500 mt-1">
+                  Create a new budget category and assign it to a tag
+                </p>
+              </CardHeader>
+              <CardContent>
+                <form className="flex flex-col gap-4" onSubmit={e => { e.preventDefault(); handleAddBudgetCategory(); }}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="relative">
+                      <Input
+                        placeholder="Category name..."
+                        value={newBudgetCategory}
+                        onChange={e => setNewBudgetCategory(e.target.value)}
+                        className="pl-10 bg-white/80 backdrop-blur-sm border-gray-200 focus:border-emerald-500 focus:ring-emerald-500"
+                      />
+                      <PiggyBank className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    </div>
+                    <Select value={newBudgetCategoryTag} onValueChange={setNewBudgetCategoryTag}>
+                      <SelectTrigger className="border-gray-200 bg-white/80 backdrop-blur-sm focus:border-emerald-500 focus:ring-emerald-500">
+                        <SelectValue placeholder="Select tag" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {budgetTags.map(tag => (
+                          <SelectItem key={tag.id} value={tag.id}>{tag.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex gap-4">
+                    <div className="relative flex-grow sm:flex-grow-0 sm:w-48">
+                      <Input
+                        type="number"
+                        placeholder="Default budget amount..."
+                        value={newBudgetCategoryDefault}
+                        onChange={e => setNewBudgetCategoryDefault(e.target.value)}
+                        className="pl-10 bg-white/80 backdrop-blur-sm border-gray-200 focus:border-emerald-500 focus:ring-emerald-500"
+                      />
+                      <Banknote className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    </div>
+                    <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700">
+                      <Plus className="h-5 w-5 mr-2" />
+                      Add Category
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
             {/* Category Management UI, grouped by tag - mobile friendly */}
             {budgetTags.map(tag => (
-              <Card key={tag.id} className="mb-6">
-                <CardHeader>
-                  <CardTitle>{tag.name}</CardTitle>
+              <Card key={tag.id} className="mb-6 bg-gradient-to-br from-white to-blue-50/30">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${tag.name === 'NoTag' ? 'bg-amber-100' : 'bg-blue-100'}`}>
+                      {tag.name === 'NoTag' ? 
+                        <Wallet className="h-5 w-5 text-amber-600" /> : 
+                        <Tag className="h-5 w-5 text-blue-600" />
+                      }
+                    </div>
+                    <span>{tag.name}</span>
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={e => handleCategoryDragEnd(e, tag.id)}>
                     <SortableContext items={budgetCategories.filter(cat => cat.parent_id === tag.id).map(cat => cat.id)} strategy={verticalListSortingStrategy}>
-                      <div className="flex flex-wrap gap-2 overflow-x-auto pb-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pb-2">
                         {budgetCategories.filter(cat => cat.parent_id === tag.id).map(cat => (
                           <DraggableItem
                             key={cat.id}
