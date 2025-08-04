@@ -20,8 +20,19 @@ create table if not exists tags (
 create table if not exists categories (
   id uuid primary key default gen_random_uuid(),
   name text not null,
+  type text check (type in ('expense', 'income')) not null,
   tag_id uuid references tags(id) on delete set null,
-  default_value numeric default 0
+  default_value numeric default 0,
+  "order" integer default 0
+);
+
+-- Budget Categories Table (used by BudgetPage)
+create table if not exists categoriesbudget (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  parent_id uuid references categoriesbudget(id) on delete cascade,
+  default_value numeric default 0,
+  "order" integer default 0
 );
 
 -- Transactions Table
@@ -39,7 +50,8 @@ create table if not exists transactions (
 CREATE TABLE payment_methods (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name VARCHAR(100) NOT NULL UNIQUE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  "order" integer DEFAULT 0
 );
 
 -- Insert default categories
@@ -73,21 +85,27 @@ ALTER TABLE auth_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payment_methods ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tags ENABLE ROW LEVEL SECURITY;
 
 -- Create policies for public access (simple authentication system)
 CREATE POLICY "Allow all operations" ON auth_sessions FOR ALL USING (true);
 CREATE POLICY "Allow all operations" ON transactions FOR ALL USING (true);
 CREATE POLICY "Allow all operations" ON categories FOR ALL USING (true);
 CREATE POLICY "Allow all operations" ON payment_methods FOR ALL USING (true);
+CREATE POLICY "Allow all operations" ON tags FOR ALL USING (true);
 
 -- Create indexes for better performance
 CREATE INDEX idx_transactions_date ON transactions(date);
 CREATE INDEX idx_transactions_type ON transactions(type);
-CREATE INDEX idx_transactions_category ON transactions(category);
+CREATE INDEX idx_transactions_category ON transactions(category_id);
 CREATE INDEX idx_auth_sessions_token ON auth_sessions(session_token);
-CREATE INDEX idx_auth_sessions_expires ON auth_sessions(expires_at); 
+CREATE INDEX idx_auth_sessions_expires ON auth_sessions(expires_at);
 
-ALTER TABLE categoriesbudget ADD COLUMN IF NOT EXISTS "order" integer;
+-- Enable RLS for categoriesbudget
+ALTER TABLE categoriesbudget ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all operations" ON categoriesbudget FOR ALL USING (true);
+
+-- Add order management for categoriesbudget
 -- Set default order for existing tags (parent_id is null)
 DO $$
 DECLARE
@@ -100,7 +118,6 @@ BEGIN
   END LOOP;
 END $$; 
 
-ALTER TABLE categoriesbudget DROP COLUMN IF EXISTS category_order;
 -- Set order for all categories (parent_id is not null) to a unique, sequential value within each tag group
 DO $$
 DECLARE
@@ -115,4 +132,4 @@ BEGIN
       i := i + 1;
     END LOOP;
   END LOOP;
-END $$; 
+END $$;
